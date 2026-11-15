@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:rotide_native/rotide_native.dart';
 import 'package:rotide_ui_kit/rotide_ui_kit.dart';
 
+import 'app/english.dart';
 import 'app/preferences.dart';
 import 'app/scope.dart';
 import 'app/symbol_loader.dart';
@@ -114,6 +115,8 @@ class _RotideAppState extends State<RotideApp> with WidgetsBindingObserver {
         dark: dark,
         accessibility: widget.accessibility.value,
         capitalized: widget.preferences.capitalized,
+        language: widget.preferences.language,
+        translate: English.translate,
         child: WidgetsApp(
           title: 'rotide.dm',
           color: palette.ink,

@@ -8,6 +8,7 @@
 #include <wrl/client.h>
 
 #include <algorithm>
+#include <cwchar>
 
 #include "resource.h"
 #include "rotide_window.h"
@@ -182,15 +183,32 @@ void RotideHost::Removed(RotideWindow* window) {
   if (windows_.empty()) PostQuitMessage(0);
 }
 
+// The interface language: the stored choice, otherwise Russian when the system's regional language is Russian and
+// English elsewhere. The Flutter side reads the same "language" preference with the same rule.
+bool RotideHost::EnglishInterface() const {
+  auto values = Preferences();
+  auto found = values.find(EncodableValue("language"));
+  if (found != values.end()) {
+    if (auto language = std::get_if<std::string>(&found->second)) {
+      if (*language == "en") return true;
+      if (*language == "ru") return false;
+    }
+  }
+  wchar_t locale[LOCALE_NAME_MAX_LENGTH] = {};
+  if (GetUserDefaultLocaleName(locale, static_cast<int>(std::size(locale))) > 0 && wcsncmp(locale, L"ru", 2) == 0) return false;
+  return true;
+}
+
 void RotideHost::ShowOpenDialog(HWND owner) {
   ComPtr<IFileOpenDialog> dialog;
   if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dialog)))) return;
+  const bool english = EnglishInterface();
   COMDLG_FILTERSPEC filters[] = {
       {L"Markdown", L"*.md;*.markdown;*.mdown;*.mkd;*.mkdn;*.mdwn;*.mdtxt;*.mdtext"},
-      {L"Текст", L"*.txt;*.text"},
+      {english ? L"Text" : L"Текст", L"*.txt;*.text"},
       {L"Word", L"*.docx"},
       {L"RTF", L"*.rtf"},
-      {L"Все поддерживаемые", L"*.md;*.markdown;*.mdown;*.mkd;*.mkdn;*.mdwn;*.mdtxt;*.mdtext;*.txt;*.text;*.docx;*.rtf"},
+      {english ? L"All supported" : L"Все поддерживаемые", L"*.md;*.markdown;*.mdown;*.mkd;*.mkdn;*.mdwn;*.mdtxt;*.mdtext;*.txt;*.text;*.docx;*.rtf"},
   };
   dialog->SetFileTypes(5, filters);
   DWORD options = 0;
@@ -264,7 +282,7 @@ void RotideHost::SetPreference(const std::string& key_name, const EncodableValue
   }
   EncodableMap change{{EncodableValue("key"), EncodableValue(key_name)}, {EncodableValue("value"), value}};
   Broadcast("preference", EncodableValue(change));
-  if (key_name == "recentDocumentPaths") UpdateJumpList();
+  if (key_name == "recentDocumentPaths" || key_name == "language") UpdateJumpList();
 }
 
 void RotideHost::Broadcast(const std::string& method, const EncodableValue& arguments) {
@@ -406,7 +424,7 @@ void RotideHost::UpdateJumpList() {
     }
   }
   ComPtr<IObjectArray> array;
-  if (added > 0 && SUCCEEDED(items.As(&array))) list->AppendCategory(L"недавние", array.Get());
+  if (added > 0 && SUCCEEDED(items.As(&array))) list->AppendCategory(EnglishInterface() ? L"recent" : L"недавние", array.Get());
   list->CommitList();
 }
 

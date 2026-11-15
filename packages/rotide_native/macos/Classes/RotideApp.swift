@@ -20,7 +20,7 @@ public final class RotideApp: NSObject {
 
     public func applicationWillFinishLaunching() {
         NSApp.mainMenu = MainMenu.make()
-        MainMenu.apply(capitalized: UserDefaults.standard.bool(forKey: "capitalizedLabels"))
+        MainMenu.applyPreferences()
         Appearance.apply(Preferences.string("appearance") ?? "system")
         IconManager.shared.applyAtLaunch()
         // Save panels open expanded, with the sidebar and the folder contents.
@@ -46,7 +46,7 @@ public final class RotideApp: NSObject {
         }
     }
 
-    public func dockMenu() -> NSMenu { RecentMenu.make(title: "недавние", includeClear: false) }
+    public func dockMenu() -> NSMenu { RecentMenu.make(title: Language.current.text("недавние"), includeClear: false) }
 
     public func shouldHandleReopen(hasVisibleWindows: Bool) -> Bool {
         if !hasVisibleWindows { showStart() }
@@ -187,7 +187,7 @@ enum Preferences {
     static func set(_ key: String, _ value: Any?) {
         if let value, !(value is NSNull) { UserDefaults.standard.set(value, forKey: key) } else { UserDefaults.standard.removeObject(forKey: key) }
         RotideApp.shared.broadcast("preference", ["key": key, "value": value ?? NSNull()])
-        if key == "capitalizedLabels" { MainMenu.apply(capitalized: value as? Bool ?? false) }
+        if key == "capitalizedLabels" || key == "language" { MainMenu.applyPreferences() }
         if key == "recentDocumentPaths" {
             DistributedNotificationCenter.default().postNotificationName(IconManager.changedNotification, object: nil, userInfo: nil, deliverImmediately: true)
         }
@@ -195,7 +195,7 @@ enum Preferences {
 
     static func all() -> [String: Any] {
         var values: [String: Any] = [:]
-        for key in ["appearance", "frosted", "transparency", "zoom", "appIcon", "capitalizedLabels", "sidebar", "sidebarWidth", "recentDocumentPaths"] {
+        for key in ["appearance", "frosted", "transparency", "zoom", "appIcon", "capitalizedLabels", "language", "sidebar", "sidebarWidth", "recentDocumentPaths"] {
             if let value = UserDefaults.standard.object(forKey: key) { values[key] = value }
         }
         return values
@@ -225,7 +225,7 @@ final class RecentMenu: NSObject, NSMenuDelegate {
         }
         if includeClear {
             if !paths.isEmpty { menu.addItem(.separator()) }
-            let clear = NSMenuItem(title: "очистить меню", action: #selector(RecentMenu.clear(_:)), keyEquivalent: "")
+            let clear = NSMenuItem(title: Language.current.text("очистить меню"), action: #selector(RecentMenu.clear(_:)), keyEquivalent: "")
             clear.target = shared
             clear.isEnabled = !paths.isEmpty
             menu.addItem(clear)

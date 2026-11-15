@@ -6,6 +6,7 @@ import '../motion/spring_motion.dart';
 import '../theme.dart';
 import '../tokens/geometry.dart';
 import '../tokens/motion.dart';
+import '../tokens/palette.dart';
 import 'interactive.dart';
 import 'label_text.dart';
 import 'surfaces.dart';
@@ -71,7 +72,7 @@ class _SegmentedState<T> extends State<Segmented<T>> {
     final height = widget.compact ? 22.0 : 26.0;
     var widest = 0.0;
     for (var i = 0; i < count; i++) {
-      widest = math.max(widest, _intrinsic(i, widget.options[i].$2));
+      widest = math.max(widest, _intrinsic(i, RotideTheme.textOf(context, widget.options[i].$2)));
     }
     return LayoutBuilder(builder: (context, constraints) {
       final intrinsic = widest * count + _gap * (count - 1);
@@ -79,9 +80,19 @@ class _SegmentedState<T> extends State<Segmented<T>> {
       final inner = math.max(math.max(widget.width - 4, intrinsic), proposed);
       final each = ((inner - _gap * (count - 1)) / count).ceilToDouble();
       final selected = widget.options.indexWhere((option) => option.$1 == widget.selection);
+      // A new language or letter case changes the width of the longest word: the track follows it on the spring.
+      return SpringValue(
+        value: each,
+        spring: MotionTokens.snappy,
+        builder: (context, each, _) => _track(context, palette, each, count, height, selected),
+      );
+    });
+  }
+
+  Widget _track(BuildContext context, RotidePalette palette, double each, int count, double height, int selected) {
       return Semantics(
         container: true,
-        label: widget.label,
+        label: RotideTheme.textOf(context, widget.label),
         child: Opacity(
           opacity: widget.enabled ? 1 : 0.45,
           child: Container(
@@ -95,10 +106,10 @@ class _SegmentedState<T> extends State<Segmented<T>> {
                 children: [
                   if (selected >= 0)
                     SpringValue(
-                      value: selected * (each + _gap),
+                      value: selected.toDouble(),
                       spring: MotionTokens.snappy,
-                      builder: (context, x, _) => Positioned(
-                        left: x,
+                      builder: (context, position, _) => Positioned(
+                        left: position * (each + _gap),
                         top: 0,
                         width: each,
                         height: height,
@@ -121,7 +132,6 @@ class _SegmentedState<T> extends State<Segmented<T>> {
           ),
         ),
       );
-    });
   }
 
   Widget _segment(BuildContext context, int index, bool chosen) {

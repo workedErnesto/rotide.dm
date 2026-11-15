@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show Locale, PlatformDispatcher;
 
 import 'package:flutter/foundation.dart';
 import 'package:rotide_core/rotide_core.dart';
@@ -47,6 +48,23 @@ final class Preferences extends ChangeNotifier implements PreferenceStore {
   set appIcon(String value) {
     write('appIcon', value);
     _bridge.setIcon(value);
+  }
+
+  /// The interface language: the user's choice, otherwise Russian when the system prefers it and English elsewhere
+  /// (the rule mica uses; the host's menus follow the same rule).
+  RotideLanguage get language => switch (_values['language']) {
+        'ru' => RotideLanguage.ru,
+        'en' => RotideLanguage.en,
+        _ => systemLanguage(),
+      };
+  set language(RotideLanguage value) => write('language', value.name);
+
+  static RotideLanguage systemLanguage([List<Locale>? locales]) {
+    for (final locale in locales ?? PlatformDispatcher.instance.locales) {
+      if (locale.languageCode == 'ru') return RotideLanguage.ru;
+      if (locale.languageCode == 'en') return RotideLanguage.en;
+    }
+    return RotideLanguage.en;
   }
 
   bool get capitalized => _values['capitalizedLabels'] as bool? ?? false;

@@ -432,7 +432,7 @@ final class _ExportButton extends StatelessWidget {
       child: controller.exporting != null
           ? Semantics(
               key: const ValueKey('progress'),
-              label: 'идёт экспорт',
+              label: RotideTheme.textOf(context, 'идёт экспорт'),
               child: SizedBox.square(dimension: 28, child: CupertinoActivityIndicator(radius: 7, color: palette.text2)),
             )
           : IconButton(

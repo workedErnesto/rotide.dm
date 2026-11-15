@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rotide_core/rotide_core.dart';
+import 'package:rotide_dm/app/english.dart';
+import 'package:rotide_dm/app/preferences.dart';
 import 'package:rotide_dm/document/document_controller.dart';
 import 'package:rotide_dm/editor/command_menu.dart';
 import 'package:rotide_dm/editor/markdown_editor.dart';
@@ -213,6 +215,74 @@ void main() {
       expect(description.stiffness, closeTo(438.6, 0.1));
       expect(description.damping, closeTo(36.0, 0.1));
       expect(MotionTokens.snappy.value(2), closeTo(1, 0.001));
+    });
+  });
+
+  group('english interface', () {
+    final placeholder = RegExp(r'\{\w+\}');
+    Set<String> names(String text) => {for (final match in placeholder.allMatches(text)) match[0]!};
+
+    test('every entry keeps the placeholders of its Russian text', () {
+      for (final entry in English.table.entries) {
+        expect(names(entry.value), names(entry.key), reason: entry.key);
+        expect(entry.value.trim(), isNotEmpty, reason: entry.key);
+      }
+    });
+
+    test('translates a text and a sentence with a file name in it', () {
+      expect(English.translate('готово'), 'done');
+      expect(English.translate('файл «заметки.md» не найден'), 'file “заметки.md” was not found');
+      expect(English.translate('3 из 12'), '3 of 12');
+      expect(English.translate('Без названия 2'), 'Untitled 2');
+    });
+
+    test('a file name is put in as it is, never translated', () {
+      expect(English.translate('файл «готово» не найден'), 'file “готово” was not found');
+    });
+
+    test('a text without an entry stays as written', () {
+      expect(English.translate('Заметки о поездке'), 'Заметки о поездке');
+      expect(English.translate('hello'), 'hello');
+    });
+
+    test('the system language decides when nothing is chosen', () {
+      expect(Preferences.systemLanguage(const [Locale('ru', 'RU'), Locale('en')]), RotideLanguage.ru);
+      expect(Preferences.systemLanguage(const [Locale('de'), Locale('en')]), RotideLanguage.en);
+      expect(Preferences.systemLanguage(const [Locale('de')]), RotideLanguage.en);
+    });
+
+    test('slash commands are found by their English names and insert English placeholders', () {
+      final menu = CommandMenuController()..language = RotideLanguage.en;
+      menu.update(const TextEditingValue(text: '', selection: TextSelection.collapsed(offset: 0)));
+      menu.update(const TextEditingValue(text: '/', selection: TextSelection.collapsed(offset: 1)));
+      menu.update(const TextEditingValue(text: '/head', selection: TextSelection.collapsed(offset: 5)));
+      expect(menu.filtered.map((c) => c.nameIn(RotideLanguage.en)), ['heading', 'subheading']);
+      final link = editorCommands.firstWhere((command) => command.name == 'ссылка');
+      expect(link.textIn(RotideLanguage.en), '[text](address)');
+      expect(link.textIn(RotideLanguage.ru), '[текст](адрес)');
+    });
+
+    testWidgets('a label changes language with a cross-fade, and a name inside it is left alone', (tester) async {
+      Widget app(RotideLanguage language) => Directionality(
+            textDirection: TextDirection.ltr,
+            child: RotideTheme(
+              dark: false,
+              accessibility: const RotideAccessibility(),
+              language: language,
+              translate: English.translate,
+              child: const Column(children: [LabelText('новый файл'), LabelText('заметки.md')]),
+            ),
+          );
+      await tester.pumpWidget(app(RotideLanguage.ru));
+      expect(find.text('новый файл'), findsOneWidget);
+      await tester.pumpWidget(app(RotideLanguage.en));
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(find.text('новый файл'), findsOneWidget, reason: 'the old text is still fading out');
+      expect(find.text('new file'), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(find.text('новый файл'), findsNothing);
+      expect(find.text('new file'), findsOneWidget);
+      expect(find.text('заметки.md'), findsOneWidget);
     });
   });
 }

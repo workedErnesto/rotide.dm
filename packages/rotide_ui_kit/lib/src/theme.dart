@@ -22,12 +22,31 @@ final class RotideAccessibility {
   int get hashCode => Object.hash(reduceMotion, reduceTransparency, increaseContrast);
 }
 
+/// Interface language. Authored text is written in Russian; English comes from a table keyed by the Russian text.
+/// Documents, file names and paths are never translated.
+enum RotideLanguage { ru, en }
+
+/// English text for an authored Russian string, or the string itself when the table has no entry for it.
+typedef RotideTranslate = String Function(String russian);
+
 /// Palette, accessibility and fonts for everything below it.
 final class RotideTheme extends InheritedWidget {
-  const RotideTheme({super.key, required this.dark, required this.accessibility, this.capitalized = false, required super.child});
+  const RotideTheme({
+    super.key,
+    required this.dark,
+    required this.accessibility,
+    this.capitalized = false,
+    this.language = RotideLanguage.ru,
+    this.translate,
+    required super.child,
+  });
 
   final bool dark;
   final RotideAccessibility accessibility;
+
+  /// The language of the interface text and the table that turns the Russian source text into English.
+  final RotideLanguage language;
+  final RotideTranslate? translate;
 
   /// The interface text starts with a capital letter (the user's choice); by default it starts with a lowercase one.
   final bool capitalized;
@@ -44,10 +63,20 @@ final class RotideTheme extends InheritedWidget {
   static RotidePalette paletteOf(BuildContext context) => of(context).palette;
   static bool reduceMotionOf(BuildContext context) => of(context).reduceMotion;
   static bool capitalizedOf(BuildContext context) => of(context).capitalized;
+  static RotideLanguage languageOf(BuildContext context) => of(context).language;
+
+  /// An authored string in the interface language, before the letter case style is applied.
+  String localize(String text) => language == RotideLanguage.en && translate != null ? translate!(text) : text;
+
+  /// [text] in the interface language; for text that is not drawn by [LabelText] (labels for assistive technology).
+  static String textOf(BuildContext context, String text) => of(context).localize(text);
 
   @override
   bool updateShouldNotify(RotideTheme oldWidget) =>
-      dark != oldWidget.dark || accessibility != oldWidget.accessibility || capitalized != oldWidget.capitalized;
+      dark != oldWidget.dark ||
+      accessibility != oldWidget.accessibility ||
+      capitalized != oldWidget.capitalized ||
+      language != oldWidget.language;
 }
 
 /// System fonts: SF Pro on macOS, Segoe UI Variable on Windows. Nothing is bundled.

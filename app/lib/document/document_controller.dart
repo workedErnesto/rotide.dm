@@ -7,6 +7,7 @@ import 'package:rotide_core/rotide_core.dart';
 import 'package:rotide_native/rotide_native.dart';
 import 'package:rotide_ui_kit/rotide_ui_kit.dart';
 
+import '../app/english.dart';
 import '../app/preferences.dart';
 import '../app/scope.dart';
 import '../shell/shell.dart';
@@ -83,6 +84,8 @@ final class DocumentController extends ChangeNotifier {
   final NativeBridge bridge;
   final PageAssets assets;
 
+  late RotideLanguage _language = preferences.language;
+
   static int _untitledCount = 0;
   int _untitledNumber = 0;
 
@@ -129,15 +132,19 @@ final class DocumentController extends ChangeNotifier {
   String get displayName {
     final current = path;
     if (current != null) return current.split(Platform.pathSeparator).last;
-    return _untitledNumber <= 1 ? 'Без названия' : 'Без названия $_untitledNumber';
+    return tr(_untitledNumber <= 1 ? 'Без названия' : 'Без названия $_untitledNumber');
   }
+
+  /// A Russian source text in the interface language, for text that does not go through a label: names and prompts
+  /// handed to the host, and parts put into a longer sentence.
+  String tr(String russian) => preferences.language == RotideLanguage.en ? English.translate(russian) : russian;
 
   /// Base of exported file names: the document name without its extension.
   String get exportBaseName {
     final name = displayName;
     final dot = name.lastIndexOf('.');
     final base = path != null && dot > 0 ? name.substring(0, dot) : name;
-    return base.isEmpty ? 'документ' : base;
+    return base.isEmpty ? tr('документ') : base;
   }
 
   // Loading
@@ -329,6 +336,10 @@ final class DocumentController extends ChangeNotifier {
 
   void _preferencesChanged() {
     _zoom = preferences.zoom;
+    if (_language != preferences.language) {
+      _language = preferences.language;
+      if (path == null) _publishDocument();
+    }
     _publishState();
     notifyListeners();
   }
@@ -450,7 +461,7 @@ final class DocumentController extends ChangeNotifier {
     if (dialog != null) return Future.value(null);
     exportMenu = false;
     _setDialog(DialogRequest(
-      title: 'сохранить в формате ${format.title}?',
+      title: 'сохранить в формате ${tr(format.title)}?',
       detail: 'файл «$displayName» будет собран заново из текста: шрифты, цвета, картинки, колонтитулы и примечания '
           'не сохранятся; копия в Markdown оставит исходный файл без изменений',
       actions: [
@@ -552,8 +563,8 @@ final class DocumentController extends ChangeNotifier {
     exportMenu = false;
     notifyListeners();
     final chosen = await bridge.savePanel(
-      title: 'экспорт: ${format.title}',
-      prompt: 'экспортировать',
+      title: tr('экспорт: ${tr(format.title)}'),
+      prompt: tr('экспортировать'),
       name: '$exportBaseName.${format.extension}',
       directory: baseDirectory,
       extension: format.extension,
@@ -571,7 +582,7 @@ final class DocumentController extends ChangeNotifier {
     exporting = null;
     _publishState();
     notifyListeners();
-    if (error != null) showError('не удалось экспортировать: ${format.title}', error);
+    if (error != null) showError('не удалось экспортировать: ${tr(format.title)}', error);
   }
 
   Future<String?> _write(ExportFormat format, String target) async {
@@ -594,7 +605,7 @@ final class DocumentController extends ChangeNotifier {
   /// The page in the light theme, so paper stays white.
   String printablePage() => PageBuilder.page(title: exportBaseName, body: pageBody(MarkdownRenderer.render(source).html), css: assets.css, theme: PageTheme.light);
 
-  static String pageBody(String html) => html.isEmpty ? '<p class="empty-document">пусто: оформленный текст появится здесь</p>' : html;
+  String pageBody(String html) => html.isEmpty ? '<p class="empty-document">${tr('пусто: оформленный текст появится здесь')}</p>' : html;
 
   Future<void> print() async {
     final error = await bridge.print(html: printablePage(), base: baseDirectory, title: exportBaseName);

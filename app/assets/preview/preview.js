@@ -7,21 +7,29 @@
     : window.chrome?.webview?.postMessage(message);
   const content = () => document.getElementById("content");
 
+  // The labels this script adds to the page, in the interface language the app reports.
+  const labels = {
+    ru: { copy: "копировать", copyCode: "копировать код", copied: "скопировано" },
+    en: { copy: "copy", copyCode: "copy code", copied: "copied" },
+  };
+  let language = "ru";
+  const label = (key) => (labels[language] ?? labels.ru)[key];
+
   function decorate() {
     for (const block of content().querySelectorAll(".highlight")) {
       if (block.querySelector(".copy-code")) continue;
       const button = document.createElement("button");
       button.className = "copy-code";
       button.type = "button";
-      button.textContent = "копировать";
-      button.setAttribute("aria-label", "копировать код");
+      button.textContent = label("copy");
+      button.setAttribute("aria-label", label("copyCode"));
       button.addEventListener("click", (event) => {
         event.preventDefault();
         post({ type: "copy", text: block.querySelector("code")?.innerText ?? "" });
-        button.textContent = "скопировано";
+        button.textContent = label("copied");
         button.classList.add("done");
         clearTimeout(button._reset);
-        button._reset = setTimeout(() => { button.textContent = "копировать"; button.classList.remove("done"); }, 1600);
+        button._reset = setTimeout(() => { button.textContent = label("copy"); button.classList.remove("done"); }, 1600);
       });
       block.appendChild(button);
     }
@@ -68,6 +76,13 @@
     scrollFraction(fraction) {
       const max = document.documentElement.scrollHeight - window.innerHeight;
       window.scrollTo(0, Math.max(0, max * fraction));
+    },
+    language(code) {
+      language = labels[code] ? code : "ru";
+      for (const button of content().querySelectorAll(".copy-code")) {
+        button.textContent = label(button.classList.contains("done") ? "copied" : "copy");
+        button.setAttribute("aria-label", label("copyCode"));
+      }
     },
     selectionText() { return String(window.getSelection() ?? ""); },
   };

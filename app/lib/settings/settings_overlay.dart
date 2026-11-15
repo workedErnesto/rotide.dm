@@ -207,6 +207,20 @@ class _SettingsContentState extends State<_SettingsContent> {
             ),
           ]),
           gap,
+          _Group(title: 'язык интерфейса', children: [
+            _Row(
+              title: 'язык',
+              trailing: Segmented<RotideLanguage>(
+                selection: preferences.language,
+                // Each language is named in itself, so the names are neither translated nor re-cased.
+                literal: true,
+                options: const [(RotideLanguage.ru, 'русский'), (RotideLanguage.en, 'english')],
+                label: 'язык',
+                onChanged: (value) => preferences.language = value,
+              ),
+            ),
+          ]),
+          gap,
           _Group(
             title: 'материал оболочки',
             footnote: 'прозрачность действует только на оболочку окна',

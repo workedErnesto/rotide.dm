@@ -14,6 +14,7 @@ final class Interactive extends StatefulWidget {
     this.onTap,
     this.enabled = true,
     this.semanticLabel,
+    this.translateLabel = true,
     this.selected = false,
     this.button = true,
     this.focusable = false,
@@ -22,6 +23,9 @@ final class Interactive extends StatefulWidget {
   final VoidCallback? onTap;
   final bool enabled;
   final String? semanticLabel;
+
+  /// False when the label is a document's own text (a file name, a heading), which is never translated.
+  final bool translateLabel;
   final bool selected;
   final bool button;
   final bool focusable;
@@ -53,7 +57,7 @@ class _InteractiveState extends State<Interactive> {
       button: widget.button,
       enabled: widget.enabled,
       selected: widget.selected,
-      label: widget.semanticLabel,
+      label: widget.semanticLabel == null || !widget.translateLabel ? widget.semanticLabel : RotideTheme.textOf(context, widget.semanticLabel!),
       onTap: _active ? widget.onTap : null,
       child: MouseRegion(
         onEnter: (_) => setState(() => _hover = true),

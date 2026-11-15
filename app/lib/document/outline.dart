@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:rotide_core/rotide_core.dart';
 import 'package:rotide_ui_kit/rotide_ui_kit.dart';
 
+import '../app/english.dart';
 import '../shell/text_utils.dart';
 import 'document_controller.dart';
 
@@ -123,7 +124,7 @@ class _OutlineSidebarState extends State<OutlineSidebar> {
             duration: MotionTokens.hover,
             layoutBuilder: (current, previous) => Stack(alignment: Alignment.centerLeft, children: [...previous, ?current]),
             child: LabelText(
-              _statsLine(controller.stats),
+              _statsLine(controller.stats, RotideTheme.languageOf(context)),
               key: ValueKey(controller.stats.words),
               maxLines: 1,
               style: RotideFonts.system(11.5, color: palette.text3).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
@@ -134,8 +135,12 @@ class _OutlineSidebarState extends State<OutlineSidebar> {
     );
   }
 
-  static String _statsLine(TextStats stats) {
+  static String _statsLine(TextStats stats, RotideLanguage language) {
     final words = stats.words;
+    if (language == RotideLanguage.en) {
+      if (words == 0) return English.translate('пустой документ');
+      return '${Russian.grouped(words, ',')} ${words == 1 ? 'word' : 'words'}, ${stats.readingMinutes} min read';
+    }
     if (words == 0) return 'пустой документ';
     return '${Russian.grouped(words)} ${Russian.plural(words, 'слово', 'слова', 'слов')}, ${stats.readingMinutes} мин чтения';
   }
@@ -151,13 +156,15 @@ final class _OutlineRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = RotideTheme.paletteOf(context);
-    final title = heading.title.isEmpty ? 'без названия' : heading.title;
+    final title = heading.title.isEmpty ? RotideTheme.textOf(context, 'без названия') : heading.title;
     return Hint(
       message: heading.title,
+      verbatim: true,
       child: Interactive(
         onTap: onTap,
         selected: active,
         semanticLabel: title,
+        translateLabel: false,
         builder: (context, hover, pressed) => PressScale(
           pressed: pressed,
           scale: 0.98,

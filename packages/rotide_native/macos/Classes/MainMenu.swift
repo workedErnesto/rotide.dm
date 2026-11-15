@@ -1,6 +1,6 @@
 import AppKit
 
-/// The menu bar, in Russian and in rotide.dm's lowercase style. Text editing commands go through the responder chain
+/// The menu bar, written in Russian and shown in the interface language and in rotide.dm's lowercase style. Text editing commands go through the responder chain
 /// (the Flutter text field and the web page both answer them); document and view commands go to the key window's Dart.
 enum MainMenu {
     static func make() -> NSMenu {
@@ -20,20 +20,26 @@ enum MainMenu {
 
     private static var written: [ObjectIdentifier: String] = [:]
 
-    /// The menu text in the letter case the user chose: lowercase as written, or raised at the first letter. Window
-    /// titles and recent files are the user's own names and keep their spelling.
-    static func apply(capitalized: Bool, in menu: NSMenu? = NSApp.mainMenu) {
+    /// The menu bar in the stored language and letter case.
+    static func applyPreferences() {
+        apply(capitalized: UserDefaults.standard.bool(forKey: "capitalizedLabels"), language: .current)
+    }
+
+    /// The menu text in the language and the letter case the user chose: lowercase as written, or raised at the first
+    /// letter. Window titles and recent files are the user's own names and keep their spelling.
+    static func apply(capitalized: Bool, language: Language, in menu: NSMenu? = NSApp.mainMenu) {
         guard let menu else { return }
         for item in menu.items where !item.isSeparatorItem {
             if item.representedObject is NSWindow || item.action == #selector(NSWindow.makeKeyAndOrderFront(_:)) { continue }
             let key = ObjectIdentifier(item)
             let original = written[key] ?? item.title
             written[key] = original
-            let title = capitalized && !original.hasPrefix("rotide.dm") ? original.prefix(1).uppercased() + original.dropFirst() : original
+            let translated = language.text(original)
+            let title = capitalized && !original.hasPrefix("rotide.dm") ? translated.prefix(1).uppercased() + translated.dropFirst() : translated
             item.title = title
             guard let sub = item.submenu, sub.delegate !== RecentMenu.shared else { continue }
             if menu === NSApp.mainMenu { sub.title = title }
-            apply(capitalized: capitalized, in: sub)
+            apply(capitalized: capitalized, language: language, in: sub)
         }
     }
 
@@ -182,4 +188,94 @@ final class DocumentCommands: NSObject, NSMenuItemValidation {
         guard let name = sender.identifier?.rawValue else { return }
         target?.send("menu", ["command": name, "tag": sender.tag])
     }
+}
+
+/// Interface language of the host's own text: the menu bar, the Dock menu and the preview's accessibility label. The
+/// Flutter side draws everything else and reads the same `language` preference, so the two always agree.
+enum Language {
+    case ru, en
+
+    /// The user's choice, otherwise Russian when the system prefers it and English elsewhere.
+    static var current: Language {
+        switch Preferences.string("language") {
+        case "ru": return .ru
+        case "en": return .en
+        default: return preferred()
+        }
+    }
+
+    static func preferred(_ languages: [String] = Locale.preferredLanguages) -> Language {
+        for code in languages {
+            if code.hasPrefix("ru") { return .ru }
+            if code.hasPrefix("en") { return .en }
+        }
+        return .en
+    }
+
+    /// A text written in Russian, in this language. A text the table does not know stays as written.
+    func text(_ russian: String) -> String {
+        self == .en ? (English.table[russian] ?? russian) : russian
+    }
+}
+
+/// English text of the host, keyed by the Russian text it is written with, in the lowercase style of the product.
+enum English {
+    static let table: [String: String] = [
+        // Menu bar
+        "справка": "help",
+        "о rotide.dm": "about rotide.dm",
+        "настройки…": "settings…",
+        "службы": "services",
+        "скрыть rotide.dm": "hide rotide.dm",
+        "скрыть остальные": "hide others",
+        "показать все": "show all",
+        "завершить rotide.dm": "quit rotide.dm",
+        "файл": "file",
+        "новый": "new",
+        "открыть…": "open…",
+        "открыть недавние": "open recent",
+        "начальное окно": "start window",
+        "закрыть": "close",
+        "сохранить": "save",
+        "сохранить как…": "save as…",
+        "вернуть к сохранённому": "revert to saved",
+        "экспортировать как": "export as",
+        "веб-страница HTML…": "web page, HTML…",
+        "документ PDF…": "document, PDF…",
+        "документ Word…": "document, Word…",
+        "текст RTF…": "text, RTF…",
+        "простой текст…": "plain text…",
+        "меню экспорта": "export menu",
+        "напечатать…": "print…",
+        "правка": "edit",
+        "отменить": "undo",
+        "повторить": "redo",
+        "вырезать": "cut",
+        "скопировать": "copy",
+        "вставить": "paste",
+        "вставить без форматирования": "paste as plain text",
+        "выбрать все": "select all",
+        "найти": "find",
+        "найти…": "find…",
+        "найти и заменить…": "find and replace…",
+        "найти далее": "find next",
+        "найти ранее": "find previous",
+        "искать выделенное": "use selection for find",
+        "вид": "view",
+        "чтение": "read",
+        "содержание": "outline",
+        "увеличить": "zoom in",
+        "уменьшить": "zoom out",
+        "реальный размер": "actual size",
+        "во весь экран": "enter full screen",
+        "окно": "window",
+        "свернуть": "minimize",
+        "изменить масштаб": "zoom",
+        "все окна на передний план": "bring all to front",
+        // Recent files
+        "недавние": "recent",
+        "очистить меню": "clear menu",
+        // Preview
+        "предпросмотр": "preview",
+    ]
 }

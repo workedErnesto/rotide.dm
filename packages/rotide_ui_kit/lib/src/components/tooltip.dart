@@ -10,8 +10,11 @@ import 'label_text.dart';
 /// A help tag that appears after the pointer rests on a control, like the system tooltip SwiftUI's `.help()` shows:
 /// small, below the pointer, gone on the first click or when the pointer leaves.
 final class Hint extends StatefulWidget {
-  const Hint({super.key, required this.message, required this.child});
+  const Hint({super.key, required this.message, required this.child, this.verbatim = false});
   final String message;
+
+  /// The message is a document's own text (a heading, a file name): shown as it is, neither translated nor re-cased.
+  final bool verbatim;
   final Widget child;
 
   @override
@@ -66,7 +69,7 @@ class _HintState extends State<Hint> {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                  child: Text(styledLabel(widget.message, capitalized: RotideTheme.capitalizedOf(context)), style: RotideFonts.system(11, color: palette.ink)),
+                  child: Text(widget.verbatim ? widget.message : styledLabel(RotideTheme.textOf(context, widget.message), capitalized: RotideTheme.capitalizedOf(context)), style: RotideFonts.system(11, color: palette.ink)),
                 ),
               ),
             ),

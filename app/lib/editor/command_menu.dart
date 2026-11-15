@@ -1,12 +1,23 @@
 import 'package:flutter/widgets.dart';
 import 'package:rotide_ui_kit/rotide_ui_kit.dart';
 
+import '../app/english.dart';
+
 /// A snippet inserted by the `/` menu: the text and where the caret goes in it.
 final class EditorCommand {
-  const EditorCommand(this.name, this.text, this.cursor);
+  const EditorCommand(this.name, this.text, this.cursor, {this.englishText});
   final String name;
   final String text;
   final int cursor;
+
+  /// The snippet with its placeholder words in English, when it has any.
+  final String? englishText;
+
+  /// The name in the interface language: the Russian source text, or its English entry.
+  String nameIn(RotideLanguage language) => language == RotideLanguage.en ? English.translate(name) : name;
+
+  /// What goes into the document: the placeholder words of a link or a table follow the interface language.
+  String textIn(RotideLanguage language) => language == RotideLanguage.en ? englishText ?? text : text;
 }
 
 const editorCommands = [
@@ -18,10 +29,10 @@ const editorCommands = [
   EditorCommand('цитата', '> ', 2),
   EditorCommand('код', '```\n\n```', 4),
   EditorCommand('линия', '---\n', 4),
-  EditorCommand('ссылка', '[текст](адрес)', 1),
+  EditorCommand('ссылка', '[текст](адрес)', 1, englishText: '[text](address)'),
   EditorCommand('жирный', '****', 2),
   EditorCommand('курсив', '**', 1),
-  EditorCommand('таблица', '| столбец | столбец |\n| --- | --- |\n|  |  |', 2),
+  EditorCommand('таблица', '| столбец | столбец |\n| --- | --- |\n|  |  |', 2, englishText: '| column | column |\n| --- | --- |\n|  |  |'),
 ];
 
 /// State of the `/` menu: where the slash is, the query typed after it and the highlighted command.
@@ -34,8 +45,13 @@ final class CommandMenuController extends ChangeNotifier {
 
   bool get open => start != null;
 
-  List<EditorCommand> get filtered =>
-      [for (final command in editorCommands) if (query.isEmpty || command.name.toLowerCase().contains(query.toLowerCase())) command];
+  /// The language the commands are named and searched in; the editor keeps it in step with the interface.
+  RotideLanguage language = RotideLanguage.ru;
+
+  List<EditorCommand> get filtered => [
+        for (final command in editorCommands)
+          if (query.isEmpty || command.nameIn(language).toLowerCase().contains(query.toLowerCase())) command,
+      ];
 
   EditorCommand? get chosen {
     final list = filtered;

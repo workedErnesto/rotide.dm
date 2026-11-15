@@ -18,9 +18,10 @@ String styledLabel(String text, {required bool capitalized}) {
 
 /// Authored interface text (buttons, titles, hints), never a document's own text, a file name or a path.
 ///
-/// Changing the letter case in settings does not swap the strings at once: the old text gives way to the new one
-/// on the snappy spring, the way a SwiftUI text changes inside an animation. A [literal] text keeps its own case
-/// whatever the style, for the option that names the style itself.
+/// The text is written in Russian and shown in the interface language ([RotideTheme.localize]). Changing the language
+/// or the letter case in settings does not swap the strings at once: the old text gives way to the new one on the
+/// snappy spring, the way a SwiftUI text changes inside an animation. A [literal] text keeps its own case whatever the
+/// style, for the option that names the style itself.
 ///
 /// An [opticalCenter] label is raised by [RotideFonts.lowercaseDrop] so its letters, not its line box, sit in the
 /// middle of the row or control that centres it. Paint only: the layout keeps its size.
@@ -53,19 +54,27 @@ final class LabelText extends StatefulWidget {
 class _LabelTextState extends State<LabelText> with SingleTickerProviderStateMixin {
   late final SpringVector _fade = SpringVector(vsync: this, initial: const [1]);
   bool? _capitalized;
+  RotideLanguage? _language;
   String? _previous;
+  String? _lastShown;
 
-  String _shown(bool capitalized) => widget.literal ? widget.text : styledLabel(widget.text, capitalized: capitalized);
+  String _shown(RotideTheme theme) {
+    final text = theme.localize(widget.text);
+    return widget.literal ? text : styledLabel(text, capitalized: theme.capitalized);
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final capitalized = RotideTheme.capitalizedOf(context);
-    final before = _capitalized;
-    _capitalized = capitalized;
-    if (before == null || before == capitalized || widget.literal) return;
-    final old = _shown(before);
-    if (old == _shown(capitalized)) return;
+    final theme = RotideTheme.of(context);
+    final changed = _capitalized != null && (_capitalized != theme.capitalized || _language != theme.language);
+    _capitalized = theme.capitalized;
+    _language = theme.language;
+    if (!changed) return;
+    // The text that was on screen, not the one the previous style would make of the new source string: the text
+    // itself can change together with the language (a counter, a file name inside a sentence).
+    final old = _lastShown;
+    if (old == null || old == _shown(theme)) return;
     _previous = old;
     _fade.values[0] = 0;
     _fade.animateTo(const [1], MotionTokens.snappy);
@@ -102,7 +111,8 @@ class _LabelTextState extends State<LabelText> with SingleTickerProviderStateMix
   }
 
   Widget _content(BuildContext context) {
-    final current = _shown(RotideTheme.capitalizedOf(context));
+    final current = _shown(RotideTheme.of(context));
+    _lastShown = current;
     final previous = _previous;
     if (previous == null) return _text(current);
     return ListenableBuilder(

@@ -28,7 +28,8 @@ class _PreviewPaneState extends State<PreviewPane> {
   late final StreamSubscription<PreviewNavigation> _navigations;
   late final StreamSubscription<Heading> _reveal;
   bool _ready = false;
-  String? _shownHtml;
+  String? _shownBody;
+  RotideLanguage? _shownLanguage;
   (String?,)? _base;
   double? _zoom;
   bool? _blocked;
@@ -68,19 +69,26 @@ class _PreviewPaneState extends State<PreviewPane> {
       _page.background(canvas);
     }
     final directory = _controller.baseDirectory;
-    final html = _controller.rendered.html;
+    final body = _controller.pageBody(_controller.rendered.html);
     if (_base == null || _base!.$1 != directory) {
       _base = (directory,);
       _ready = false;
-      _shownHtml = html;
-      _page.load(
-        PageBuilder.page(title: _controller.displayName, body: DocumentController.pageBody(html), css: assets.css),
-        directory,
-      );
-    } else if (_ready && _shownHtml != html) {
-      _shownHtml = html;
-      _page.eval('rotide.update(${jsonEncode(DocumentController.pageBody(html))})');
+      _shownBody = body;
+      _page.load(PageBuilder.page(title: _controller.displayName, body: body, css: assets.css), directory);
+    } else if (_ready && _shownBody != body) {
+      _shownBody = body;
+      _page.eval('rotide.update(${jsonEncode(body)})');
     }
+    _syncLanguage();
+  }
+
+  /// The page script owns the labels it adds (the copy button of a code block): it learns the language when the page
+  /// is ready and whenever the setting changes.
+  void _syncLanguage() {
+    final language = _controller.preferences.language;
+    if (!_ready || _shownLanguage == language) return;
+    _shownLanguage = language;
+    _page.eval('rotide.language(${jsonEncode(language.name)})');
   }
 
   void _scroll(String anchor, {required bool animated}) {
@@ -96,7 +104,9 @@ class _PreviewPaneState extends State<PreviewPane> {
     switch (body['type']) {
       case 'ready':
         _ready = true;
-        if (_shownHtml != _controller.rendered.html) setState(() {});
+        _shownLanguage = null;
+        if (_shownBody != _controller.pageBody(_controller.rendered.html)) setState(() {});
+        _syncLanguage();
         final anchor = _pendingAnchor;
         if (anchor != null) {
           _pendingAnchor = null;

@@ -36,7 +36,7 @@ final class PreviewView: NSView, WKNavigationDelegate, WKUIDelegate, WKScriptMes
         web.navigationDelegate = self
         web.uiDelegate = self
         web.allowsMagnification = true
-        web.setAccessibilityLabel("предпросмотр")
+        web.setAccessibilityLabel(Language.current.text("предпросмотр"))
         web.configuration.userContentController.add(WeakMessages(self), contentWorld: WebPage.world, name: "rotide")
         web.frame = bounds
         web.autoresizingMask = [.width, .height]

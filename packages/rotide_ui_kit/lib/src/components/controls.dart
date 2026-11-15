@@ -23,7 +23,7 @@ final class MSwitch extends StatelessWidget {
       opacity: enabled ? 1 : 0.45,
       child: Semantics(
         toggled: value,
-        label: label,
+        label: label == null ? null : RotideTheme.textOf(context, label!),
         child: Interactive(
           onTap: enabled ? () => onChanged(!value) : null,
           button: false,
@@ -135,7 +135,7 @@ class _MSliderState extends State<MSlider> {
     final fraction = ((widget.value.clamp(widget.min, widget.max) - widget.min) / span);
     final step = span / 20;
     return Semantics(
-      label: widget.label,
+      label: RotideTheme.textOf(context, widget.label),
       value: '${(fraction * 100).round()}%',
       onIncrease: () => widget.onChanged((widget.value + step).clamp(widget.min, widget.max)),
       onDecrease: () => widget.onChanged((widget.value - step).clamp(widget.min, widget.max)),

@@ -55,6 +55,7 @@ class RotideHost {
   RotideHost() = default;
   void Add(std::unique_ptr<RotideWindow> window);
   void UpdateJumpList();
+  bool EnglishInterface() const;
   void UpdateShortcutIcons(int resource);
   void AskNext(size_t index);
   static LRESULT CALLBACK HostProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam);

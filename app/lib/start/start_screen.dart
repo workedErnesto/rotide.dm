@@ -238,6 +238,7 @@ final class _RecentTile extends StatelessWidget {
       child: Interactive(
         onTap: () => onOpen(path),
         semanticLabel: name,
+        translateLabel: false,
         builder: (context, hover, pressed) => PressScale(
           pressed: pressed,
           scale: 0.98,

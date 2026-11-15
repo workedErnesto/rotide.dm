@@ -11,12 +11,13 @@ abstract final class Russian {
     return many;
   }
 
-  /// 12 345 with a narrow no-break space, as `formatted(.number)` writes in the Russian locale.
-  static String grouped(int n) {
+  /// 12 345 with a no-break space, as `formatted(.number)` writes in the Russian locale; English groups
+  /// with a comma.
+  static String grouped(int n, [String separator = ' ']) {
     final digits = n.abs().toString();
     final buffer = StringBuffer(n < 0 ? '-' : '');
     for (var i = 0; i < digits.length; i++) {
-      if (i > 0 && (digits.length - i) % 3 == 0) buffer.write(' ');
+      if (i > 0 && (digits.length - i) % 3 == 0) buffer.write(separator);
       buffer.write(digits[i]);
     }
     return buffer.toString();

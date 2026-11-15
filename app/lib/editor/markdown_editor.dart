@@ -291,7 +291,7 @@ class MarkdownEditorState extends State<MarkdownEditor> implements TextSelection
     final caret = _text.selection.baseOffset;
     _commands.close();
     if (start == null || caret <= start || caret > _text.text.length || _text.text[start] != '/') return;
-    final updated = _text.text.replaceRange(start, caret, command.text);
+    final updated = _text.text.replaceRange(start, caret, command.textIn(_commands.language));
     _text.value = TextEditingValue(text: updated, selection: TextSelection.collapsed(offset: start + command.cursor));
     focus();
   }
@@ -336,6 +336,7 @@ class MarkdownEditorState extends State<MarkdownEditor> implements TextSelection
   @override
   Widget build(BuildContext context) {
     final palette = RotideTheme.paletteOf(context);
+    _commands.language = RotideTheme.languageOf(context);
     final size = 15 * _document.zoom;
     _cachedRatio ??= _lineHeightFor(15);
     _text

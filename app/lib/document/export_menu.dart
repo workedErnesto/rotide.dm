@@ -93,7 +93,7 @@ class _ExportMenuState extends State<_ExportMenu> {
       },
       child: Semantics(
         container: true,
-        label: 'экспорт',
+        label: RotideTheme.textOf(context, 'экспорт'),
         child: SizedBox(
           width: 300,
           child: RaisedSurface(
