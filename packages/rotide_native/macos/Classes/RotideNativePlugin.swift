@@ -120,7 +120,9 @@ public final class RotideNativePlugin: NSObject, FlutterPlugin {
 }
 
 enum Panels {
-    static let markdownTypes: [UTType] = [UTType("net.daringfireball.markdown"), .plainText].compactMap { $0 }
+    /// Markdown, any plain text, Word and RTF: what rotide.dm opens for reading and editing.
+    static let markdownTypes: [UTType] = [UTType("net.daringfireball.markdown"), .plainText,
+                                          UTType("org.openxmlformats.wordprocessingml.document"), .rtf].compactMap { $0 }
 
     static func openPanel() -> NSOpenPanel {
         let panel = NSOpenPanel()

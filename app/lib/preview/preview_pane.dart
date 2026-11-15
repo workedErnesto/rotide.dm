@@ -157,6 +157,6 @@ class _PreviewPaneState extends State<PreviewPane> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _sync(assets, canvas);
     });
-    return PreviewHost(controller: _page, script: assets.script, radius: Radii.card);
+    return PreviewHost(controller: _page, script: assets.script, radius: CardSurface.contentRadius);
   }
 }

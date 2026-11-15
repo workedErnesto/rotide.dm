@@ -188,8 +188,11 @@ void RotideHost::ShowOpenDialog(HWND owner) {
   COMDLG_FILTERSPEC filters[] = {
       {L"Markdown", L"*.md;*.markdown;*.mdown;*.mkd;*.mkdn;*.mdwn;*.mdtxt;*.mdtext"},
       {L"Текст", L"*.txt;*.text"},
+      {L"Word", L"*.docx"},
+      {L"RTF", L"*.rtf"},
+      {L"Все поддерживаемые", L"*.md;*.markdown;*.mdown;*.mkd;*.mkdn;*.mdwn;*.mdtxt;*.mdtext;*.txt;*.text;*.docx;*.rtf"},
   };
-  dialog->SetFileTypes(2, filters);
+  dialog->SetFileTypes(5, filters);
   DWORD options = 0;
   dialog->GetOptions(&options);
   dialog->SetOptions(options | FOS_ALLOWMULTISELECT | FOS_FILEMUSTEXIST | FOS_FORCEFILESYSTEM);

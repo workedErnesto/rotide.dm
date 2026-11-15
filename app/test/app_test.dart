@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rotide_core/rotide_core.dart';
 import 'package:rotide_dm/document/document_controller.dart';
 import 'package:rotide_dm/editor/command_menu.dart';
 import 'package:rotide_dm/editor/markdown_editor.dart';
@@ -27,6 +28,27 @@ void main() {
     });
   });
 
+  group('formats', () {
+    test('by extension', () {
+      expect(DocumentFormat.of(null), DocumentFormat.markdown);
+      expect(DocumentFormat.of('/a/README.MD'), DocumentFormat.markdown);
+      expect(DocumentFormat.of('/a/notes.txt'), DocumentFormat.plainText);
+      expect(DocumentFormat.of('/a/server.log'), DocumentFormat.plainText);
+      expect(DocumentFormat.of(r'C:\docs\Отчёт.DOCX'), DocumentFormat.word);
+      expect(DocumentFormat.of('/a/letter.rtf'), DocumentFormat.rtf);
+      expect(DocumentFormat.word.converted, isTrue);
+      expect(DocumentFormat.plainText.converted, isFalse);
+    });
+
+    test('Word and RTF open as Markdown, text as it is', () {
+      final docx = DocxWriter.document(markdown: '# Отчёт\n\n**итог**', title: 'T');
+      expect(DocumentController.read(docx, DocumentFormat.word), '# Отчёт\n\n**итог**\n');
+      final rtf = latin1.encode(RtfWriter.document(markdown: '# Отчёт\n\n*итог*', title: 'T'));
+      expect(DocumentController.read(rtf, DocumentFormat.rtf), '# Отчёт\n\n*итог*\n');
+      expect(DocumentController.read(utf8.encode('# not a heading'), DocumentFormat.plainText), '# not a heading');
+    });
+  });
+
   group('editor styling', () {
     final palette = RotidePalette(dark: false, contrast: false);
     StyledText style(String text) => MarkdownStyler.style(text, palette: palette, size: 15, lineHeight: 1.9);
@@ -41,6 +63,12 @@ void main() {
     test('heading marker is hidden, text inside code fences is not styled', () {
       expect(style('# Title').concealed, containsAll([0, 1]));
       expect(style('```\n**not bold**\n```').concealed, isEmpty);
+    });
+
+    test('plain text shows every character', () {
+      final styled = MarkdownStyler.style('# not **bold** [x](y)', palette: palette, size: 15, lineHeight: 1.9, plain: true);
+      expect(styled.concealed, isEmpty);
+      expect(styled.span.children, hasLength(1));
     });
 
     test('image syntax stays visible', () {

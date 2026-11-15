@@ -1,7 +1,8 @@
 import 'dart:convert';
+import 'dart:io' show ZLibDecoder;
 import 'dart:typed_data';
 
-/// A ZIP archive with stored (uncompressed) entries: enough for an Office Open XML package, which Word, Pages and
+/// Writes a ZIP archive with stored (uncompressed) entries: enough for an Office Open XML package, which Word, Pages and
 /// LibreOffice accept with or without compression.
 final class ZipArchive {
   final _data = BytesBuilder(copy: false);
@@ -88,5 +89,69 @@ abstract final class Crc32 {
       crc = _table[(crc ^ byte) & 0xFF] ^ (crc >> 8);
     }
     return crc ^ 0xFFFFFFFF;
+  }
+}
+
+/// Reads the entries of a ZIP archive, stored or deflated: what Word, Pages and LibreOffice write into a .docx.
+final class ZipReader {
+  ZipReader(this._bytes) : _view = ByteData.sublistView(_bytes) {
+    _readDirectory();
+  }
+
+  final Uint8List _bytes;
+  final ByteData _view;
+  final _entries = <String, ({int method, int size, int offset})>{};
+
+  Iterable<String> get names => _entries.keys;
+
+  void _readDirectory() {
+    // The end record is the last 22 bytes plus a comment of at most 64 KB.
+    var end = -1;
+    final lowest = _bytes.length - 22 - 0xFFFF < 0 ? 0 : _bytes.length - 22 - 0xFFFF;
+    for (var i = _bytes.length - 22; i >= lowest; i--) {
+      if (_view.getUint32(i, Endian.little) == 0x06054b50) {
+        end = i;
+        break;
+      }
+    }
+    if (end < 0) throw const FormatException('файл не является архивом ZIP');
+    final count = _view.getUint16(end + 10, Endian.little);
+    var position = _view.getUint32(end + 16, Endian.little);
+    for (var index = 0; index < count; index++) {
+      if (position + 46 > _bytes.length || _view.getUint32(position, Endian.little) != 0x02014b50) {
+        throw const FormatException('оглавление архива ZIP повреждено');
+      }
+      final method = _view.getUint16(position + 10, Endian.little);
+      final size = _view.getUint32(position + 20, Endian.little);
+      final nameLength = _view.getUint16(position + 28, Endian.little);
+      final extraLength = _view.getUint16(position + 30, Endian.little);
+      final commentLength = _view.getUint16(position + 32, Endian.little);
+      final offset = _view.getUint32(position + 42, Endian.little);
+      final name = utf8.decode(_bytes.sublist(position + 46, position + 46 + nameLength), allowMalformed: true);
+      _entries[name] = (method: method, size: size, offset: offset);
+      position += 46 + nameLength + extraLength + commentLength;
+    }
+  }
+
+  /// The bytes of an entry, or null when the archive has no such entry.
+  Uint8List? read(String name) {
+    final entry = _entries[name];
+    if (entry == null) return null;
+    final header = entry.offset;
+    if (header + 30 > _bytes.length || _view.getUint32(header, Endian.little) != 0x04034b50) {
+      throw FormatException('запись «$name» архива ZIP повреждена');
+    }
+    final start = header + 30 + _view.getUint16(header + 26, Endian.little) + _view.getUint16(header + 28, Endian.little);
+    final data = Uint8List.sublistView(_bytes, start, (start + entry.size).clamp(start, _bytes.length));
+    return switch (entry.method) {
+      0 => data,
+      8 => Uint8List.fromList(ZLibDecoder(raw: true).convert(data)),
+      _ => throw FormatException('запись «$name» сжата неподдерживаемым способом'),
+    };
+  }
+
+  String? text(String name) {
+    final data = read(name);
+    return data == null ? null : utf8.decode(data, allowMalformed: true);
   }
 }

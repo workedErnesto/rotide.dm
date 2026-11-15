@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:rotide_core/rotide_core.dart';
 import 'package:rotide_core/src/zip_archive.dart';
@@ -178,6 +179,141 @@ void main() {
       expect(rtf, contains(r'\trowd'));
       expect(rtf, contains(r'{\cf8 let}'));
       expect('{'.allMatches(rtf).length - r'\{'.allMatches(rtf).length, '}'.allMatches(rtf).length - r'\}'.allMatches(rtf).length);
+    });
+  });
+
+  group('reading other formats', () {
+    const markdown = '# Title\n\nSome **bold** and *it* and ~~gone~~, [link](https://example.com), `code`, a_b.\n\n## Lists\n\n'
+        '- one\n- two\n  - nested\n- [x] done\n\n1. first\n2. second\n\n> quoted text\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n'
+        '```swift\nlet x = 1\nprint(x)\n```\n\n---\n\nEnd.\n';
+
+    void expectSameStructure(String read) {
+      expect(read, startsWith('# Title\n\nSome **bold** and *it* and ~~gone~~, [link](https://example.com), `code`, a_b.\n\n## Lists\n\n'));
+      expect(read, contains('- one\n- two\n  - nested\n- [x] done\n'));
+      expect(read, contains('1. first\n2. second'));
+      expect(read, contains('> quoted text'));
+      expect(read, contains('| a | b |\n| --- | --- |\n| 1 | 2 |'));
+      expect(read, contains('```\nlet x = 1\nprint(x)\n```'));
+      expect(read, contains('---\n\nEnd.\n'));
+      // The Markdown renders to the same blocks as the original.
+      final html = MarkdownRenderer.render(read).html;
+      expect(html, contains('<del>gone</del>'));
+      expect(html, contains('<table>'));
+      expect('<li>'.allMatches(html).length, 6);
+    }
+
+    test('Word written by rotide.dm reads back as the same Markdown', () {
+      expectSameStructure(DocxReader.markdown(DocxWriter.document(markdown: markdown, title: 'T')));
+    });
+
+    test('RTF written by rotide.dm reads back as the same Markdown', () {
+      expectSameStructure(RtfReader.markdown(RtfWriter.document(markdown: markdown, title: 'T')));
+    });
+
+    test('deflated Word package with styles, numbering and drawn structure', () {
+      const w = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+          'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+      const document = '<?xml version="1.0"?><w:document $w><w:body>'
+          '<w:p><w:pPr><w:pStyle w:val="1"/></w:pPr><w:r><w:t>Глава</w:t></w:r></w:p>'
+          '<w:p><w:r><w:rPr><w:b/><w:sz w:val="40"/></w:rPr><w:t>Big bold</w:t></w:r></w:p>'
+          '<w:p><w:r><w:t xml:space="preserve">Text with </w:t></w:r><w:r><w:rPr><w:b w:val="0"/></w:rPr><w:t>plain</w:t></w:r>'
+          '<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve"> bold </w:t></w:r><w:hyperlink r:id="rId9"><w:r><w:t>site</w:t></w:r></w:hyperlink>'
+          '<w:del><w:r><w:delText>removed</w:delText></w:r></w:del><w:r><w:br/><w:t>next &amp; line</w:t></w:r></w:p>'
+          '<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="3"/></w:numPr></w:pPr><w:r><w:t>numbered</w:t></w:r></w:p>'
+          '<w:p><w:pPr><w:numPr><w:ilvl w:val="1"/><w:numId w:val="3"/></w:numPr></w:pPr><w:r><w:t>inner</w:t></w:r></w:p>'
+          '<w:p><w:pPr><w:ind w:left="720"/></w:pPr><w:r><w:tab/><w:t>•</w:t><w:tab/><w:t>drawn</w:t></w:r></w:p>'
+          '<w:p><w:r><w:rPr><w:rFonts w:ascii="Courier New"/></w:rPr><w:t>mono()</w:t></w:r></w:p>'
+          '<w:p><w:r><w:t>*not* # markup</w:t></w:r></w:p>'
+          '<w:sectPr/></w:body></w:document>';
+      const styles = '<w:styles $w><w:docDefaults><w:rPrDefault><w:rPr><w:sz w:val="22"/></w:rPr></w:rPrDefault></w:docDefaults>'
+          '<w:style w:type="paragraph" w:styleId="1"><w:name w:val="heading 1"/></w:style></w:styles>';
+      const numbering = '<w:numbering $w><w:abstractNum w:abstractNumId="7"><w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl>'
+          '<w:lvl w:ilvl="1"><w:numFmt w:val="bullet"/></w:lvl></w:abstractNum><w:num w:numId="3"><w:abstractNumId w:val="7"/></w:num></w:numbering>';
+      const relationships = '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+          '<Relationship Id="rId9" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" '
+          'Target="https://example.com/a b" TargetMode="External"/></Relationships>';
+      final parts = {'word/document.xml': document, 'word/styles.xml': styles, 'word/numbering.xml': numbering, 'word/_rels/document.xml.rels': relationships};
+      final archive = BytesBuilder();
+      final directory = BytesBuilder();
+      void add(BytesBuilder to, int bytes, int value) {
+        final data = ByteData(bytes);
+        bytes == 2 ? data.setUint16(0, value, Endian.little) : data.setUint32(0, value, Endian.little);
+        to.add(data.buffer.asUint8List());
+      }
+      for (final MapEntry(key: name, value: content) in parts.entries) {
+        final raw = utf8.encode(content);
+        final packed = ZLibEncoder(raw: true).convert(raw);
+        final offset = archive.length;
+        final nameBytes = utf8.encode(name);
+        for (final (builder, central) in [(archive, false), (directory, true)]) {
+          add(builder, 4, central ? 0x02014b50 : 0x04034b50);
+          if (central) add(builder, 2, 20);
+          for (final value in [20, 0, 8, 0, 0]) {
+            add(builder, 2, value);
+          }
+          add(builder, 4, Crc32.checksum(raw));
+          add(builder, 4, packed.length);
+          add(builder, 4, raw.length);
+          add(builder, 2, nameBytes.length);
+          add(builder, 2, 0);
+          if (central) {
+            for (final value in [0, 0, 0]) {
+              add(builder, 2, value);
+            }
+            add(builder, 4, 0);
+            add(builder, 4, offset);
+          }
+          builder.add(nameBytes);
+          if (!central) builder.add(packed);
+        }
+      }
+      final start = archive.length;
+      final size = directory.length;
+      archive.add(directory.takeBytes());
+      add(archive, 4, 0x06054b50);
+      for (final value in [0, 0, parts.length, parts.length]) {
+        add(archive, 2, value);
+      }
+      add(archive, 4, size);
+      add(archive, 4, start);
+      add(archive, 2, 0);
+
+      final read = DocxReader.markdown(archive.takeBytes());
+      expect(
+          read,
+          '# Глава\n\n# Big bold\n\nText with plain **bold** [site](<https://example.com/a b>)\\\nnext & line\n\n'
+          '1. numbered\n   - inner\n- drawn\n\n```\nmono()\n```\n\n\\*not\\* # markup\n');
+    });
+
+    test('RTF from TextEdit: code page, Unicode, lists, fields and tables', () {
+      const rtf = r'''{\rtf1\ansi\ansicpg1251\cocoartf2822{\fonttbl\f0\fswiss Helvetica;\f1\fmodern Menlo-Regular;}'''
+          r'''{\colortbl;\red0\green0\blue0;}{\*\expandedcolortbl;;}{\info{\title secret}}'''
+          r'''\pard\f0\fs24 \b\fs48 \u1047?\'e0\'e3\'ee\'eb\'ee\'e2\'ee\'ea\b0\fs24 \par'''
+          r'''\pard \'cf\'f0\'e8\'e2\'e5\'f2, {\i \u1084\'3f\'e8\'f0} {\field{\*\fldinst{HYPERLINK "https://example.com/"}}{\fldrslt link}}\par'''
+          r'''\pard\li720\fi-720\ls1\ilvl0{\listtext\uc0\u8226 \tab}one\par'''
+          r'''{\listtext\uc0\u8226 \tab}two\par'''
+          r'''\pard\li1440\fi-720\ls1\ilvl1{\listtext 1.\tab}deep\par'''
+          r'''\pard\f1 code \{x\}\par'''
+          r'''\pard\f0\trowd\cellx1000\cellx2000\pard\intbl a\cell b\cell\row\trowd\cellx1000\cellx2000\pard\intbl 1\cell 2\cell\row'''
+          r'''\pard after\par}''';
+      expect(
+          RtfReader.markdown(rtf),
+          '# Заголовок\n\nПривет, *мир* [link](https://example.com/)\n\n- one\n- two\n  1. deep\n\n```\ncode {x}\n```\n\n'
+          '| a | b |\n| --- | --- |\n| 1 | 2 |\n\nafter\n');
+    });
+
+    test('plain text shows as written', () {
+      final markdown = MarkdownBuilder.fromPlainText('\n# not a heading\n  indented *x*\n1. not a list\n\n\nnext\n');
+      expect(markdown, '\\# not a heading\\\n  indented \\*x\\*\\\n1\\. not a list\n\nnext');
+      final html = MarkdownRenderer.render(markdown).html;
+      expect(html, isNot(contains('<h1>')));
+      expect(html, isNot(contains('<ol>')));
+      expect(html, contains('# not a heading<br />'));
+    });
+
+    test('a file that is not a package or not RTF is refused', () {
+      expect(() => DocxReader.markdown(Uint8List.fromList(utf8.encode('hello'))), throwsFormatException);
+      expect(() => RtfReader.markdown('hello'), throwsFormatException);
     });
   });
 

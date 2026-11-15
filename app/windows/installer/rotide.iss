@@ -1,7 +1,8 @@
 ; Inno Setup script for rotide.dm on Windows. Built by .github/workflows/windows.yml:
 ;   iscc /DAppVersion=1.0.0 /DArch=x64 /DSourceDir=<flutter Release folder> /DOutputDir=<folder> rotide.iss
 ; Installs per user by default (no admin prompt); the setup offers an all-users install on its first page.
-; Registers rotide.dm for Markdown files (default handler, can be unticked) and in "Open with" for .txt and .text.
+; Registers rotide.dm for Markdown files (default handler, can be unticked) and in "Open with" for .txt, .text, .docx
+; and .rtf.
 
 #ifndef AppVersion
   #define AppVersion "0.0.0"
@@ -104,6 +105,8 @@ Root: HKA; Subkey: "Software\Classes\Applications\{#AppExe}\SupportedTypes"; Val
 Root: HKA; Subkey: "Software\Classes\Applications\{#AppExe}\SupportedTypes"; ValueType: string; ValueName: ".markdown"; ValueData: ""
 Root: HKA; Subkey: "Software\Classes\Applications\{#AppExe}\SupportedTypes"; ValueType: string; ValueName: ".txt"; ValueData: ""
 Root: HKA; Subkey: "Software\Classes\Applications\{#AppExe}\SupportedTypes"; ValueType: string; ValueName: ".text"; ValueData: ""
+Root: HKA; Subkey: "Software\Classes\Applications\{#AppExe}\SupportedTypes"; ValueType: string; ValueName: ".docx"; ValueData: ""
+Root: HKA; Subkey: "Software\Classes\Applications\{#AppExe}\SupportedTypes"; ValueType: string; ValueName: ".rtf"; ValueData: ""
 Root: HKA; Subkey: "Software\rotide.dm\Capabilities"; ValueType: string; ValueName: "ApplicationName"; ValueData: "{#AppName}"; Flags: uninsdeletekey
 Root: HKA; Subkey: "Software\rotide.dm\Capabilities"; ValueType: string; ValueName: "ApplicationDescription"; ValueData: "{cm:AppDescription}"
 Root: HKA; Subkey: "Software\rotide.dm\Capabilities\FileAssociations"; ValueType: string; ValueName: ".md"; ValueData: "{#MarkdownProgId}"
@@ -114,6 +117,8 @@ Root: HKA; Subkey: "Software\rotide.dm\Capabilities\FileAssociations"; ValueType
 Root: HKA; Subkey: "Software\rotide.dm\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mdwn"; ValueData: "{#MarkdownProgId}"
 Root: HKA; Subkey: "Software\rotide.dm\Capabilities\FileAssociations"; ValueType: string; ValueName: ".txt"; ValueData: "{#TextProgId}"
 Root: HKA; Subkey: "Software\rotide.dm\Capabilities\FileAssociations"; ValueType: string; ValueName: ".text"; ValueData: "{#TextProgId}"
+Root: HKA; Subkey: "Software\rotide.dm\Capabilities\FileAssociations"; ValueType: string; ValueName: ".docx"; ValueData: "{#TextProgId}"
+Root: HKA; Subkey: "Software\rotide.dm\Capabilities\FileAssociations"; ValueType: string; ValueName: ".rtf"; ValueData: "{#TextProgId}"
 Root: HKA; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueName: "rotide.dm"; ValueData: "Software\rotide.dm\Capabilities"; Flags: uninsdeletevalue
 
 ; "Open with" entries for every supported extension, always.
@@ -125,6 +130,8 @@ Root: HKA; Subkey: "Software\Classes\.mkdn\OpenWithProgids"; ValueType: string; 
 Root: HKA; Subkey: "Software\Classes\.mdwn\OpenWithProgids"; ValueType: string; ValueName: "{#MarkdownProgId}"; ValueData: ""; Flags: uninsdeletevalue
 Root: HKA; Subkey: "Software\Classes\.txt\OpenWithProgids"; ValueType: string; ValueName: "{#TextProgId}"; ValueData: ""; Flags: uninsdeletevalue
 Root: HKA; Subkey: "Software\Classes\.text\OpenWithProgids"; ValueType: string; ValueName: "{#TextProgId}"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.docx\OpenWithProgids"; ValueType: string; ValueName: "{#TextProgId}"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.rtf\OpenWithProgids"; ValueType: string; ValueName: "{#TextProgId}"; ValueData: ""; Flags: uninsdeletevalue
 
 ; Markdown opens in rotide.dm by default when the task is ticked. Windows keeps a choice the user made in
 ; "Open with > Always" above this value; then rotide.dm is offered in that list instead.

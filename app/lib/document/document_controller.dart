@@ -34,6 +34,34 @@ enum ExportFormat {
   final String extension;
 }
 
+/// How a document is kept on disk. Word and RTF files are read into Markdown and written back from it; plain text
+/// is edited and shown as written, without Markdown.
+enum DocumentFormat {
+  markdown('Markdown', 'md'),
+  plainText('текст', 'txt'),
+  word('Word', 'docx'),
+  rtf('RTF', 'rtf');
+
+  const DocumentFormat(this.title, this.extension);
+  final String title;
+  final String extension;
+
+  static const markdownExtensions = {'md', 'markdown', 'mdown', 'mkd', 'mkdn', 'mdwn', 'mdtxt', 'mdtext'};
+
+  /// New documents are Markdown; any other extension that is not Word or RTF is plain text.
+  static DocumentFormat of(String? path) {
+    if (path == null) return markdown;
+    final name = path.split(RegExp(r'[/\\]')).last;
+    final dot = name.lastIndexOf('.');
+    final extension = dot > 0 ? name.substring(dot + 1).toLowerCase() : '';
+    if (markdownExtensions.contains(extension)) return markdown;
+    return switch (extension) { 'docx' => word, 'rtf' => rtf, _ => plainText };
+  }
+
+  /// Word and RTF are rebuilt from Markdown on saving, so formatting Markdown cannot hold does not survive.
+  bool get converted => this == word || this == rtf;
+}
+
 /// A Markdown file and the state of its window: the text, saving, the unsaved-changes question, reverting, reloading
 /// after another app changed the file, export, and what the chrome shows. NSDocument's job in the Swift version.
 final class DocumentController extends ChangeNotifier {
@@ -59,6 +87,10 @@ final class DocumentController extends ChangeNotifier {
   int _untitledNumber = 0;
 
   String? path;
+  DocumentFormat format = DocumentFormat.markdown;
+
+  /// The owner agreed to rebuild this Word or RTF file from its Markdown.
+  bool _rebuildAccepted = false;
   String _text = '';
   String _saved = '';
   DateTime? _modified;
@@ -85,6 +117,9 @@ final class DocumentController extends ChangeNotifier {
   final _closeReplies = <Completer<bool>>[];
 
   String get text => _text;
+
+  /// Markdown for the page, the outline and every export: plain text is escaped so it shows as written.
+  String get source => format == DocumentFormat.plainText ? MarkdownBuilder.fromPlainText(_text) : _text;
   bool get edited => _text != _saved;
   bool get sidebarVisible => narrow ? narrowSidebar : preferences.sidebar;
   double get zoom => _zoom;
@@ -111,7 +146,8 @@ final class DocumentController extends ChangeNotifier {
     try {
       final file = File(path);
       _modified = file.lastModifiedSync();
-      final text = decode(file.readAsBytesSync());
+      format = DocumentFormat.of(path);
+      final text = read(file.readAsBytesSync(), format);
       this.path = path;
       _replaceText(text, saved: true);
       preferences.history.record(path);
@@ -123,6 +159,20 @@ final class DocumentController extends ChangeNotifier {
       showError('не удалось открыть файл', _describe(error), onDismiss: bridge.close);
     }
   }
+
+  /// The text to edit: Word and RTF become Markdown, everything else is decoded as text.
+  static String read(List<int> bytes, DocumentFormat format) => switch (format) {
+        DocumentFormat.word => DocxReader.markdown(Uint8List.fromList(bytes)),
+        DocumentFormat.rtf => RtfReader.markdown(latin1.decode(bytes)),
+        DocumentFormat.markdown || DocumentFormat.plainText => decode(bytes),
+      };
+
+  /// The file contents for the text in a format.
+  List<int> encode(DocumentFormat format) => switch (format) {
+        DocumentFormat.word => DocxWriter.document(markdown: source, title: exportBaseName, baseDirectory: baseDirectory),
+        DocumentFormat.rtf => latin1.encode(RtfWriter.document(markdown: source, title: exportBaseName)),
+        DocumentFormat.markdown || DocumentFormat.plainText => utf8.encode(_text),
+      };
 
   /// UTF-8 first (a byte order mark is dropped), then UTF-16 with a mark, then Windows-1251 for old Russian files and
   /// Latin-1 for the rest.
@@ -188,7 +238,7 @@ final class DocumentController extends ChangeNotifier {
       final known = _modified;
       if (known != null && !modified.isAfter(known)) return;
       _modified = modified;
-      _replaceText(decode(file.readAsBytesSync()), saved: true);
+      _replaceText(read(file.readAsBytesSync(), format), saved: true);
       _publishDocument();
     } on Object {
       // The file is being written or went away; the next event or a save decides.
@@ -210,8 +260,8 @@ final class DocumentController extends ChangeNotifier {
 
   void _renderNow() {
     _renderTimer?.cancel();
-    rendered = MarkdownRenderer.render(_text);
-    stats = TextStats(MarkdownRenderer.plainText(_text));
+    rendered = MarkdownRenderer.render(source);
+    stats = TextStats(format == DocumentFormat.plainText ? _text : MarkdownRenderer.plainText(_text));
   }
 
   /// Re-renders shortly after typing pauses; a newer edit wins over an older one.
@@ -329,8 +379,14 @@ final class DocumentController extends ChangeNotifier {
   Future<bool> save() async {
     final current = path;
     if (current == null) return saveAs();
+    if (format.converted && !_rebuildAccepted) {
+      final answer = await _askToRebuild();
+      if (answer == null) return false;
+      if (!answer) return saveAs(as: DocumentFormat.markdown);
+      _rebuildAccepted = true;
+    }
     try {
-      await _writeAtomically(current, utf8.encode(_text));
+      await _writeAtomically(current, encode(format));
       _saved = _text;
       _modified = File(current).lastModifiedSync();
       preferences.history.record(current);
@@ -343,12 +399,25 @@ final class DocumentController extends ChangeNotifier {
     }
   }
 
-  Future<bool> saveAs() async {
-    final name = path == null ? '$displayName.md' : displayName;
-    final chosen = await bridge.savePanel(title: '', name: name, directory: baseDirectory, extension: 'md');
+  /// Saves under a new name in the document's format, or in [as].
+  Future<bool> saveAs({DocumentFormat? as}) async {
+    final target = as ?? format;
+    final extension = target == format && path != null && format == DocumentFormat.plainText ? _extension(displayName) : target.extension;
+    final name = path == null || target != format ? '$exportBaseName.$extension' : displayName;
+    final chosen = await bridge.savePanel(title: '', name: name, directory: baseDirectory, extension: extension);
     if (chosen == null) return false;
     try {
-      await _writeAtomically(chosen, utf8.encode(_text));
+      final chosenFormat = DocumentFormat.of(chosen);
+      if (chosenFormat == DocumentFormat.plainText && format != DocumentFormat.plainText) {
+        // Markdown saved under a text name stays Markdown text; shown as written from now on.
+        await _writeAtomically(chosen, utf8.encode(_text));
+      } else {
+        await _writeAtomically(chosen, encode(chosenFormat));
+      }
+      format = chosenFormat;
+      // A new Word or RTF file holds only what rotide.dm wrote, so saving it again loses nothing.
+      _rebuildAccepted = true;
+      _renderNow();
       path = chosen;
       _saved = _text;
       _modified = File(chosen).lastModifiedSync();
@@ -362,6 +431,36 @@ final class DocumentController extends ChangeNotifier {
       showError('не удалось сохранить документ', _describe(error));
       return false;
     }
+  }
+
+  static String _extension(String name) {
+    final dot = name.lastIndexOf('.');
+    return dot > 0 ? name.substring(dot + 1) : DocumentFormat.plainText.extension;
+  }
+
+  /// Saving over a Word or RTF file rebuilds it from the text. True to rebuild, false to save a Markdown copy
+  /// instead, null to cancel.
+  Future<bool?> _askToRebuild() {
+    final answer = Completer<bool?>();
+    void reply(bool? value) {
+      dismissDialog();
+      if (!answer.isCompleted) answer.complete(value);
+    }
+
+    if (dialog != null) return Future.value(null);
+    exportMenu = false;
+    _setDialog(DialogRequest(
+      title: 'сохранить в формате ${format.title}?',
+      detail: 'файл «$displayName» будет собран заново из текста: шрифты, цвета, картинки, колонтитулы и примечания '
+          'не сохранятся; копия в Markdown оставит исходный файл без изменений',
+      actions: [
+        DialogAction(title: 'сохранить', kind: ButtonKind.primary, isDefault: true, run: () => reply(true)),
+        DialogAction(title: 'копия в Markdown', kind: ButtonKind.ghost, run: () => reply(false)),
+        DialogAction(title: 'отмена', kind: ButtonKind.ghost, isCancel: true, run: () => reply(null)),
+      ],
+      cancel: () => reply(null),
+    ));
+    return answer.future;
   }
 
   static Future<void> _writeAtomically(String target, List<int> bytes) async {
@@ -392,7 +491,7 @@ final class DocumentController extends ChangeNotifier {
             try {
               final file = File(current);
               _modified = file.lastModifiedSync();
-              _replaceText(decode(file.readAsBytesSync()), saved: true);
+              _replaceText(read(file.readAsBytesSync(), format), saved: true);
               _publishDocument();
             } on Object catch (error) {
               showError('не удалось вернуть сохранённую версию', _describe(error));
@@ -478,14 +577,14 @@ final class DocumentController extends ChangeNotifier {
   Future<String?> _write(ExportFormat format, String target) async {
     switch (format) {
       case ExportFormat.html:
-        final body = PageBuilder.inlineLocalMedia(MarkdownRenderer.render(_text).html, baseDirectory);
+        final body = PageBuilder.inlineLocalMedia(MarkdownRenderer.render(source).html, baseDirectory);
         await _writeAtomically(target, utf8.encode(PageBuilder.page(title: exportBaseName, body: body, css: assets.css)));
       case ExportFormat.text:
-        await _writeAtomically(target, utf8.encode(MarkdownRenderer.plainText(_text)));
+        await _writeAtomically(target, utf8.encode(format == DocumentFormat.plainText ? _text : MarkdownRenderer.plainText(_text)));
       case ExportFormat.word:
-        await _writeAtomically(target, DocxWriter.document(markdown: _text, title: exportBaseName, baseDirectory: baseDirectory));
+        await _writeAtomically(target, DocxWriter.document(markdown: source, title: exportBaseName, baseDirectory: baseDirectory));
       case ExportFormat.rtf:
-        await _writeAtomically(target, latin1.encode(RtfWriter.document(markdown: _text, title: exportBaseName)));
+        await _writeAtomically(target, latin1.encode(RtfWriter.document(markdown: source, title: exportBaseName)));
       case ExportFormat.pdf:
         return bridge.pdf(html: printablePage(), base: baseDirectory, title: exportBaseName, path: target);
     }
@@ -493,7 +592,7 @@ final class DocumentController extends ChangeNotifier {
   }
 
   /// The page in the light theme, so paper stays white.
-  String printablePage() => PageBuilder.page(title: exportBaseName, body: pageBody(MarkdownRenderer.render(_text).html), css: assets.css, theme: PageTheme.light);
+  String printablePage() => PageBuilder.page(title: exportBaseName, body: pageBody(MarkdownRenderer.render(source).html), css: assets.css, theme: PageTheme.light);
 
   static String pageBody(String html) => html.isEmpty ? '<p class="empty-document">пусто: оформленный текст появится здесь</p>' : html;
 

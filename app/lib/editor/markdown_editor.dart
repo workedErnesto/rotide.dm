@@ -20,14 +20,17 @@ final class MarkdownEditingController extends TextEditingController {
   double lineHeight = 1.9;
   List<(int, int)> marks = const [];
   int? currentMark;
+
+  /// Plain text: no Markdown styling, nothing hidden.
+  bool plain = false;
   StyledText? _styled;
   String? _styledText;
   Object? _styledKey;
 
   StyledText styled() {
-    final key = (palette, size, lineHeight, marks, currentMark);
+    final key = (palette, size, lineHeight, marks, currentMark, plain);
     if (_styled == null || _styledText != text || _styledKey != key) {
-      _styled = MarkdownStyler.style(text, palette: palette!, size: size, lineHeight: lineHeight, marks: marks, currentMark: currentMark);
+      _styled = MarkdownStyler.style(text, palette: palette!, size: size, lineHeight: lineHeight, marks: marks, currentMark: currentMark, plain: plain);
       _styledText = text;
       _styledKey = key;
     }
@@ -189,7 +192,12 @@ class MarkdownEditorState extends State<MarkdownEditor> implements TextSelection
 
   void _changed() {
     _document.editorChanged(_text.text);
-    _commands.update(_text.value);
+    // The command menu inserts Markdown; plain text has none.
+    if (_document.format == DocumentFormat.plainText) {
+      _commands.close();
+    } else {
+      _commands.update(_text.value);
+    }
     if (_find.visible) _find.search(_text.text, keepIndex: true);
   }
 
@@ -333,7 +341,8 @@ class MarkdownEditorState extends State<MarkdownEditor> implements TextSelection
     _text
       ..palette = palette
       ..size = size
-      ..lineHeight = _cachedRatio!;
+      ..lineHeight = _cachedRatio!
+      ..plain = _document.format == DocumentFormat.plainText;
     final baseStyle = RotideFonts.system(size, color: palette.ink, height: _cachedRatio);
     return Focus(
       onKeyEvent: _key,

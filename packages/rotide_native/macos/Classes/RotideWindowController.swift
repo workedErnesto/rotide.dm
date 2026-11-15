@@ -1,5 +1,6 @@
 import AppKit
 import FlutterMacOS
+import UniformTypeIdentifiers
 
 /// One window with its own Flutter engine: the start window or a document. A transparent title bar over the shell,
 /// the behind-window blur under the Flutter view (the document card is drawn opaque by Flutter), the standard window
@@ -281,13 +282,15 @@ private final class ContentController: NSViewController {
     }
 }
 
-/// Takes Markdown and text files dragged onto the start window and opens them; Dart draws the dashed target.
+/// Takes Markdown, text, Word and RTF files dragged onto the start window and opens them; Dart draws the dashed target.
 private final class DropView: NSView {
-    private static let extensions: Set<String> = ["md", "markdown", "mdown", "mkd", "mkdn", "mdwn", "mdtxt", "mdtext", "txt", "text"]
+    private static let extensions: Set<String> = ["md", "markdown", "mdown", "mkd", "mkdn", "mdwn", "mdtxt", "mdtext", "txt", "text", "docx", "rtf"]
 
     private func files(_ info: NSDraggingInfo) -> [URL] {
         let urls = info.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
-        return urls.filter { Self.extensions.contains($0.pathExtension.lowercased()) }
+        return urls.filter { url in
+            Self.extensions.contains(url.pathExtension.lowercased()) || UTType(filenameExtension: url.pathExtension)?.conforms(to: .plainText) == true
+        }
     }
 
     private var controller: RotideWindowController? { window?.windowController as? RotideWindowController }

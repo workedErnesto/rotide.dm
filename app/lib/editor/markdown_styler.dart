@@ -62,7 +62,9 @@ abstract final class MarkdownStyler {
     return (match.start + at, value.length);
   }
 
-  static StyledText style(String text, {required RotidePalette palette, required double size, required double lineHeight, List<(int, int)> marks = const [], int? currentMark}) {
+  /// [plain] text gets no Markdown styling: every character shows as typed, only find highlights are drawn.
+  static StyledText style(String text,
+      {required RotidePalette palette, required double size, required double lineHeight, List<(int, int)> marks = const [], int? currentMark, bool plain = false}) {
     final length = text.length;
     final fonts = List<_Font>.filled(length, const _Font(scale: 1));
     final inks = List<_Ink>.filled(length, _Ink.ink);
@@ -93,92 +95,94 @@ abstract final class MarkdownStyler {
       }
     }
 
-    for (final match in _heading.allMatches(text)) {
-      final level = match.group(1)!.length;
-      final scale = level == 1 ? 2.0 : level == 2 ? 1.5 : 1.2;
-      font(match.start, match.end - match.start, _Font(scale: scale, weight: FontWeight.w600));
-      final (markerStart, markerLength) = _group(match, 1);
-      ink(markerStart, markerLength, _Ink.text3);
-      conceal(match.start, (level + 1).clamp(0, match.end - match.start));
-    }
-    for (final match in _setext.allMatches(text)) {
-      ink(match.start, match.end - match.start, _Ink.text3);
-    }
-    for (final match in _quote.allMatches(text)) {
-      ink(match.start, match.end - match.start, _Ink.text2);
-    }
-    for (final match in _list.allMatches(text)) {
-      ink(match.start, match.end - match.start, _Ink.text3);
-    }
-    for (final match in _rule.allMatches(text)) {
-      ink(match.start, match.end - match.start, _Ink.text3);
-    }
-    for (final match in _strong.allMatches(text)) {
-      font(match.start, match.end - match.start, const _Font(scale: 1, weight: FontWeight.w600));
-      final open = match.group(1)!.length;
-      ink(match.start, open, _Ink.text3);
-      ink(match.end - open, open, _Ink.text3);
-      conceal(match.start, open);
-      conceal(match.end - open, open, isClosing: true);
-    }
-    for (final match in _emphasis.allMatches(text)) {
-      font(match.start, match.end - match.start, const _Font(scale: 1, italic: true));
-      conceal(match.start, 1);
-      conceal(match.end - 1, 1, isClosing: true);
-    }
-    for (final match in _strike.allMatches(text)) {
-      final (innerStart, innerLength) = (match.start + 2, match.end - match.start - 4);
-      for (var i = innerStart; i < innerStart + innerLength; i++) {
-        strike[i] = true;
+    if (!plain) {
+      for (final match in _heading.allMatches(text)) {
+        final level = match.group(1)!.length;
+        final scale = level == 1 ? 2.0 : level == 2 ? 1.5 : 1.2;
+        font(match.start, match.end - match.start, _Font(scale: scale, weight: FontWeight.w600));
+        final (markerStart, markerLength) = _group(match, 1);
+        ink(markerStart, markerLength, _Ink.text3);
+        conceal(match.start, (level + 1).clamp(0, match.end - match.start));
       }
-      ink(match.start, match.end - match.start, _Ink.text2);
-      conceal(match.start, 2);
-      conceal(match.end - 2, 2, isClosing: true);
-    }
-    for (final match in _html.allMatches(text)) {
-      ink(match.start, match.end - match.start, _Ink.text3);
-    }
-    for (final match in _link.allMatches(text)) {
-      final open = match.group(1)!, label = match.group(2)!, middle = match.group(3)!, url = match.group(4)!;
-      final openAt = match.start;
-      final labelAt = openAt + open.length;
-      final middleAt = labelAt + label.length;
-      final urlAt = middleAt + middle.length;
-      final closeAt = urlAt + url.length;
-      ink(openAt, open.length, _Ink.text3);
-      ink(labelAt, label.length, _Ink.link);
-      ink(middleAt, middle.length, _Ink.text3);
-      ink(urlAt, url.length, _Ink.text3);
-      ink(closeAt, 1, _Ink.text3);
-      if (!open.startsWith('!')) {
-        conceal(openAt, open.length);
-        conceal(middleAt, middle.length, isClosing: true);
-        conceal(urlAt, url.length, isClosing: true);
-        conceal(closeAt, 1, isClosing: true);
+      for (final match in _setext.allMatches(text)) {
+        ink(match.start, match.end - match.start, _Ink.text3);
       }
-    }
-    for (final match in _autolink.allMatches(text)) {
-      ink(match.start, match.end - match.start, _Ink.link);
-    }
-    for (final match in _code.allMatches(text)) {
-      font(match.start, match.end - match.start, const _Font(scale: 0.9, mono: true));
-      ink(match.start, match.end - match.start, _Ink.text2);
-      for (var i = match.start; i < match.end; i++) {
-        codeFill[i] = true;
+      for (final match in _quote.allMatches(text)) {
+        ink(match.start, match.end - match.start, _Ink.text2);
       }
-      final open = match.group(1)!.length;
-      conceal(match.start, open);
-      conceal(match.end - open, open, isClosing: true);
-    }
-    // Fences last: nothing inside a code block is Markdown.
-    for (final match in _fence.allMatches(text)) {
-      for (var i = match.start; i < match.end; i++) {
-        fonts[i] = const _Font(scale: 1);
-        inks[i] = _Ink.text2;
-        codeFill[i] = false;
-        strike[i] = false;
-        concealed.remove(i);
-        closing.remove(i);
+      for (final match in _list.allMatches(text)) {
+        ink(match.start, match.end - match.start, _Ink.text3);
+      }
+      for (final match in _rule.allMatches(text)) {
+        ink(match.start, match.end - match.start, _Ink.text3);
+      }
+      for (final match in _strong.allMatches(text)) {
+        font(match.start, match.end - match.start, const _Font(scale: 1, weight: FontWeight.w600));
+        final open = match.group(1)!.length;
+        ink(match.start, open, _Ink.text3);
+        ink(match.end - open, open, _Ink.text3);
+        conceal(match.start, open);
+        conceal(match.end - open, open, isClosing: true);
+      }
+      for (final match in _emphasis.allMatches(text)) {
+        font(match.start, match.end - match.start, const _Font(scale: 1, italic: true));
+        conceal(match.start, 1);
+        conceal(match.end - 1, 1, isClosing: true);
+      }
+      for (final match in _strike.allMatches(text)) {
+        final (innerStart, innerLength) = (match.start + 2, match.end - match.start - 4);
+        for (var i = innerStart; i < innerStart + innerLength; i++) {
+          strike[i] = true;
+        }
+        ink(match.start, match.end - match.start, _Ink.text2);
+        conceal(match.start, 2);
+        conceal(match.end - 2, 2, isClosing: true);
+      }
+      for (final match in _html.allMatches(text)) {
+        ink(match.start, match.end - match.start, _Ink.text3);
+      }
+      for (final match in _link.allMatches(text)) {
+        final open = match.group(1)!, label = match.group(2)!, middle = match.group(3)!, url = match.group(4)!;
+        final openAt = match.start;
+        final labelAt = openAt + open.length;
+        final middleAt = labelAt + label.length;
+        final urlAt = middleAt + middle.length;
+        final closeAt = urlAt + url.length;
+        ink(openAt, open.length, _Ink.text3);
+        ink(labelAt, label.length, _Ink.link);
+        ink(middleAt, middle.length, _Ink.text3);
+        ink(urlAt, url.length, _Ink.text3);
+        ink(closeAt, 1, _Ink.text3);
+        if (!open.startsWith('!')) {
+          conceal(openAt, open.length);
+          conceal(middleAt, middle.length, isClosing: true);
+          conceal(urlAt, url.length, isClosing: true);
+          conceal(closeAt, 1, isClosing: true);
+        }
+      }
+      for (final match in _autolink.allMatches(text)) {
+        ink(match.start, match.end - match.start, _Ink.link);
+      }
+      for (final match in _code.allMatches(text)) {
+        font(match.start, match.end - match.start, const _Font(scale: 0.9, mono: true));
+        ink(match.start, match.end - match.start, _Ink.text2);
+        for (var i = match.start; i < match.end; i++) {
+          codeFill[i] = true;
+        }
+        final open = match.group(1)!.length;
+        conceal(match.start, open);
+        conceal(match.end - open, open, isClosing: true);
+      }
+      // Fences last: nothing inside a code block is Markdown.
+      for (final match in _fence.allMatches(text)) {
+        for (var i = match.start; i < match.end; i++) {
+          fonts[i] = const _Font(scale: 1);
+          inks[i] = _Ink.text2;
+          codeFill[i] = false;
+          strike[i] = false;
+          concealed.remove(i);
+          closing.remove(i);
+        }
       }
     }
 

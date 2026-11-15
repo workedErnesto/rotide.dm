@@ -71,9 +71,19 @@ final class RaisedSurface extends StatelessWidget {
 }
 
 /// Document card: canvas fill, hairline and the soft 6 pt shadow of mica's page card.
+///
+/// The hairline is painted under the content, which sits inside it. On macOS the page is a native web view, and
+/// Flutter takes every rectangle it paints above a native view out of that view's hit testing: a border drawn in
+/// front would cover the whole card and the page would get no scrolling, clicks or selection.
 final class CardSurface extends StatelessWidget {
   const CardSurface({super.key, required this.child});
   final Widget child;
+
+  /// Width of the hairline around the content.
+  static const double inset = 1;
+
+  /// Corner radius of the content inside the hairline, concentric with the card.
+  static const double contentRadius = Radii.card - inset;
 
   @override
   Widget build(BuildContext context) {
@@ -81,9 +91,11 @@ final class CardSurface extends StatelessWidget {
     return DecoratedBox(
       decoration: continuousDecoration(radius: Radii.card, color: palette.canvas, shadows: [swiftShadow(palette.shadow, 6, y: 2)]),
       child: DecoratedBox(
-        decoration: continuousDecoration(radius: Radii.card, border: palette.hairline),
-        position: DecorationPosition.foreground,
-        child: ClipRSuperellipse(borderRadius: BorderRadius.circular(Radii.card), child: child),
+        decoration: continuousDecoration(radius: Radii.card, border: palette.hairline, borderWidth: inset),
+        child: Padding(
+          padding: const EdgeInsets.all(inset),
+          child: ClipRSuperellipse(borderRadius: BorderRadius.circular(contentRadius), child: child),
+        ),
       ),
     );
   }
