@@ -1,0 +1,22 @@
+PODS:
+  - FlutterMacOS (1.0.0)
+  - rotide_native (0.1.0):
+    - FlutterMacOS
+
+DEPENDENCIES:
+  - FlutterMacOS (from `Flutter/ephemeral`)
+  - rotide_native (from `Flutter/ephemeral/.symlinks/plugins/rotide_native/macos`)
+
+EXTERNAL SOURCES:
+  FlutterMacOS:
+    :path: Flutter/ephemeral
+  rotide_native:
+    :path: Flutter/ephemeral/.symlinks/plugins/rotide_native/macos
+
+SPEC CHECKSUMS:
+  FlutterMacOS: c232990155153907050900a2e175c7773903ba4e
+  rotide_native: e9a14fdba62ee2203d7c76917a1bb165b5e72d0d
+
+PODFILE CHECKSUM: 26ee6f5033708847cf1376fbc9a71d19413c5b16
+
+COCOAPODS: 1.16.2

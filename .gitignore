@@ -1,0 +1,35 @@
+# Everything for AI assistants stays out of git: instructions, skills, prompts, references, agent logs.
+AGENTS.md
+CLAUDE.md
+PROMPT.md
+GEMINI.md
+.agents/
+.claude/
+.codex/
+.cursor/
+.cursorrules
+.gemini/
+.windsurf/
+.continue/
+.aider*
+.github/copilot-instructions.md
+**/references/
+*.prompt.txt
+**/prompt.txt
+*.agent.log
+
+# Builds and tools
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+**/Pods/
+**/ephemeral/
+**/Flutter/GeneratedPluginRegistrant.swift
+**/flutter/generated_plugin_registrant.*
+**/flutter/generated_plugins.cmake
+.fvm/
+.idea/
+*.iml
+.vscode/
+.DS_Store

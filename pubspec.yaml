@@ -1,0 +1,9 @@
+name: rotide_workspace
+publish_to: none
+environment:
+  sdk: ^3.13.4
+workspace:
+  - app
+  - packages/rotide_core
+  - packages/rotide_ui_kit
+  - packages/rotide_native

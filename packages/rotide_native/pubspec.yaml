@@ -1,0 +1,19 @@
+name: rotide_native
+description: Native layer of rotide.dm. macOS code lives here (windows, material, web view, panels, Dock); the Windows side is in the app's runner, behind the same channels.
+publish_to: none
+version: 0.1.0
+resolution: workspace
+
+environment:
+  sdk: ^3.13.4
+  flutter: ">=3.47.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      macos:
+        pluginClass: RotideNativePlugin

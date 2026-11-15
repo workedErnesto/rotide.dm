@@ -1,0 +1,17 @@
+name: rotide_ui_kit
+description: Design tokens and components of rotide.dm, ported from the Swift design system. No dependencies.
+publish_to: none
+version: 0.1.0
+resolution: workspace
+
+environment:
+  sdk: ^3.13.4
+  flutter: ">=3.47.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter

@@ -1,0 +1,17 @@
+name: rotide_core
+description: Markdown rendering and export for rotide.dm, without UI. cmark-gfm through FFI.
+publish_to: none
+version: 0.1.0
+resolution: workspace
+
+environment:
+  sdk: ^3.13.4
+
+dependencies:
+  # Build hook only: compile the vendored cmark-gfm into a native asset.
+  code_assets: ^1.0.0
+  hooks: ^1.0.0
+  native_toolchain_c: ^0.17.6
+
+dev_dependencies:
+  test: ^1.26.0

@@ -1,0 +1,109 @@
+name: windows
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-latest
+          - arch: arm64
+            runner: windows-11-arm
+    env:
+      FLUTTER_VERSION: '3.47.5'
+    steps:
+      - uses: actions/checkout@v4
+
+      # A git checkout of the release tag works on x64 and arm64 alike: the tool fetches the matching Dart SDK.
+      - name: Flutter
+        shell: pwsh
+        run: |
+          git clone --depth 1 --branch $env:FLUTTER_VERSION https://github.com/flutter/flutter.git "$env:RUNNER_TEMP\flutter"
+          "$env:RUNNER_TEMP\flutter\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+      - name: Flutter doctor
+        run: |
+          flutter config --no-analytics --enable-windows-desktop
+          flutter --version
+          flutter doctor -v
+
+      - name: Dependencies
+        run: flutter pub get
+      - name: Core tests (cmark-gfm built with MSVC)
+        working-directory: packages/rotide_core
+        run: dart test
+      - name: App tests
+        working-directory: app
+        run: flutter test
+
+      - name: Build
+        working-directory: app
+        run: flutter build windows --release
+
+      - name: Version
+        id: version
+        shell: pwsh
+        run: |
+          $line = (Select-String -Path app/pubspec.yaml -Pattern '^version:\s*([0-9.]+)').Matches[0].Groups[1].Value
+          "value=$line" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Inno Setup
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          if (-not (Test-Path $iscc)) { throw 'ISCC.exe not found' }
+          "ISCC=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Setup
+        shell: pwsh
+        run: |
+          $source = Resolve-Path "app/build/windows/${{ matrix.arch }}/runner/Release"
+          $output = Join-Path $PWD 'build/installer'
+          & $env:ISCC "/DAppVersion=${{ steps.version.outputs.value }}" "/DArch=${{ matrix.arch }}" "/DSourceDir=$source" "/DOutputDir=$output" app/windows/installer/rotide.iss
+          if ($LASTEXITCODE -ne 0) { throw "iscc exit code $LASTEXITCODE" }
+          $setup = Get-ChildItem $output -Filter '*-setup.exe' | Select-Object -First 1
+          $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLower()
+          "$hash  $($setup.Name)" | Out-File -FilePath "$($setup.FullName).sha256" -Encoding ascii -NoNewline
+
+      - name: Install quietly and open a Markdown file
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem build/installer -Filter '*-setup.exe' | Select-Object -First 1
+          $install = Start-Process $setup.FullName -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/CURRENTUSER', '/NORESTART', '/LOG=install.log' -Wait -PassThru
+          if ($install.ExitCode -ne 0) { Get-Content install.log; throw "setup exit code $($install.ExitCode)" }
+          $exe = "$env:LOCALAPPDATA\Programs\rotide.dm\rotide_dm.exe"
+          if (-not (Test-Path $exe)) { Get-Content install.log; throw 'rotide_dm.exe is not installed' }
+          $progId = (Get-ItemProperty 'HKCU:\Software\Classes\.md').'(default)'
+          if ($progId -ne 'rotide.dm.markdown') { throw ".md is mapped to '$progId'" }
+          $command = (Get-ItemProperty 'HKCU:\Software\Classes\rotide.dm.markdown\shell\open\command').'(default)'
+          Write-Host "open command: $command"
+          $txt = Get-Item 'HKCU:\Software\Classes\.txt\OpenWithProgids'
+          if ($txt.Property -notcontains 'rotide.dm.text') { throw '.txt has no rotide.dm entry in Open with' }
+          $sample = Join-Path $env:RUNNER_TEMP 'sample.md'
+          "# rotide.dm`n`nsmoke test" | Out-File -FilePath $sample -Encoding utf8
+          $app = Start-Process $exe -ArgumentList "`"$sample`"" -PassThru
+          Start-Sleep -Seconds 15
+          if ($app.HasExited) { throw "rotide.dm exited with code $($app.ExitCode)" }
+          $window = Get-Process -Id $app.Id
+          Write-Host "running, main window: '$($window.MainWindowTitle)'"
+          Stop-Process -Id $app.Id -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rotide.dm-win-${{ matrix.arch }}
+          path: |
+            build/installer/*-setup.exe
+            build/installer/*-setup.exe.sha256
+          if-no-files-found: error

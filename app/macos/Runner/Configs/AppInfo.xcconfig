@@ -1,0 +1,4 @@
+// Application-level settings for the Runner target.
+PRODUCT_NAME = rotide.dm
+PRODUCT_BUNDLE_IDENTIFIER = app.rotide.dm
+PRODUCT_COPYRIGHT = rotide.dm: md editor наоборот

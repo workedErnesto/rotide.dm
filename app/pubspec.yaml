@@ -1,0 +1,28 @@
+name: rotide_dm
+description: rotide.dm, a Markdown reader and editor for macOS and Windows.
+publish_to: none
+version: 1.0.0+1
+resolution: workspace
+
+environment:
+  sdk: ^3.13.4
+  flutter: ">=3.47.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  rotide_core:
+    path: ../packages/rotide_core
+  rotide_native:
+    path: ../packages/rotide_native
+  rotide_ui_kit:
+    path: ../packages/rotide_ui_kit
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  assets:
+    - assets/preview/
+    - assets/icons/
