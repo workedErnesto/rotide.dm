@@ -214,7 +214,7 @@ class _SettingsContentState extends State<_SettingsContent> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 child: SwitchRow(
-                  label: LabelText('матовое стекло', style: RotideFonts.system(13, color: palette.ink)),
+                  label: LabelText('матовое стекло', opticalCenter: true, style: RotideFonts.system(13, color: palette.ink)),
                   value: preferences.frosted,
                   onChanged: (value) => preferences.frosted = value,
                 ),
@@ -476,7 +476,7 @@ final class _Row extends StatelessWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           spacing: Space.normal,
           runSpacing: Space.small,
-          children: [LabelText(title, style: RotideFonts.system(13, color: palette.ink)), trailing],
+          children: [LabelText(title, opticalCenter: true, style: RotideFonts.system(13, color: palette.ink)), trailing],
         ),
       ),
     );

@@ -157,6 +157,7 @@ class _SegmentedState<T> extends State<Segmented<T>> {
                       child: LabelText(
                         title,
                         literal: widget.literal,
+                        opticalCenter: true,
                         maxLines: 1,
                         softWrap: false,
                         overflow: TextOverflow.visible,

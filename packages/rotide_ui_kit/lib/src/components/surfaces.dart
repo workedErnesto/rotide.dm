@@ -1,7 +1,9 @@
 import 'package:flutter/widgets.dart';
 
+import '../motion/spring_motion.dart';
 import '../theme.dart';
 import '../tokens/geometry.dart';
+import '../tokens/motion.dart';
 import 'symbol.dart';
 import 'label_text.dart';
 
@@ -143,6 +145,76 @@ final class EmptyState extends StatelessWidget {
           LabelText(text, textAlign: TextAlign.center, style: RotideFonts.system(12.5, color: palette.text3)),
         ],
       ),
+    );
+  }
+}
+
+/// The highlight of a menu: one plate behind the rows that slides to the row under the pointer (or the keyboard
+/// choice) on the snappy spring, the way the settings navigation moves its selection, and fades in and out over the
+/// hover duration. [top] is the row's offset inside [child], null when no row is highlighted; a plate that has faded
+/// out appears in place instead of sliding from the last row. With Reduce Motion it moves at once and only fades.
+final class MenuHighlight extends StatefulWidget {
+  const MenuHighlight({super.key, required this.top, required this.height, required this.child, this.radius = Radii.row});
+  final double? top;
+  final double height;
+  final double radius;
+  final Widget child;
+
+  @override
+  State<MenuHighlight> createState() => _MenuHighlightState();
+}
+
+class _MenuHighlightState extends State<MenuHighlight> with TickerProviderStateMixin {
+  late final _position = SpringVector(vsync: this, initial: [widget.top ?? 0]);
+  late final _opacity = AnimationController(vsync: this, duration: MotionTokens.hover, value: widget.top == null ? 0 : 1);
+  late final _changes = Listenable.merge([_position, _opacity]);
+  late bool _shown = widget.top != null;
+
+  @override
+  void didUpdateWidget(MenuHighlight old) {
+    super.didUpdateWidget(old);
+    final top = widget.top;
+    if (top == null) {
+      if (_shown) _opacity.animateTo(0, curve: Curves.easeOut);
+      _shown = false;
+      return;
+    }
+    if (top != _position.targets.first) {
+      final hidden = _opacity.value < 0.05;
+      _position.animateTo([top], hidden || RotideTheme.reduceMotionOf(context) ? null : MotionTokens.snappy);
+    }
+    if (!_shown) _opacity.animateTo(1, curve: Curves.easeOut);
+    _shown = true;
+  }
+
+  @override
+  void dispose() {
+    _position.dispose();
+    _opacity.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = RotideTheme.paletteOf(context).hover;
+    return Stack(
+      children: [
+        ListenableBuilder(
+          listenable: _changes,
+          builder: (context, _) => Positioned(
+            left: 0,
+            right: 0,
+            top: _position.values.first,
+            height: widget.height,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: continuousDecoration(radius: widget.radius, color: color.withValues(alpha: color.a * _opacity.value)),
+              ),
+            ),
+          ),
+        ),
+        widget.child,
+      ],
     );
   }
 }

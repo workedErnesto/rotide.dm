@@ -21,6 +21,9 @@ String styledLabel(String text, {required bool capitalized}) {
 /// Changing the letter case in settings does not swap the strings at once: the old text gives way to the new one
 /// on the snappy spring, the way a SwiftUI text changes inside an animation. A [literal] text keeps its own case
 /// whatever the style, for the option that names the style itself.
+///
+/// An [opticalCenter] label is raised by [RotideFonts.lowercaseDrop] so its letters, not its line box, sit in the
+/// middle of the row or control that centres it. Paint only: the layout keeps its size.
 final class LabelText extends StatefulWidget {
   const LabelText(
     this.text, {
@@ -31,6 +34,7 @@ final class LabelText extends StatefulWidget {
     this.overflow,
     this.textAlign,
     this.literal = false,
+    this.opticalCenter = false,
   });
 
   final String text;
@@ -40,6 +44,7 @@ final class LabelText extends StatefulWidget {
   final TextOverflow? overflow;
   final TextAlign? textAlign;
   final bool literal;
+  final bool opticalCenter;
 
   @override
   State<LabelText> createState() => _LabelTextState();
@@ -89,6 +94,14 @@ class _LabelTextState extends State<LabelText> with SingleTickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
+    final content = _content(context);
+    if (!widget.opticalCenter) return content;
+    final ratio = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1;
+    final drop = (RotideFonts.lowercaseDrop(widget.style?.fontSize ?? 14) * ratio).round() / ratio;
+    return drop == 0 ? content : Transform.translate(offset: Offset(0, -drop), child: content);
+  }
+
+  Widget _content(BuildContext context) {
     final current = _shown(RotideTheme.capitalizedOf(context));
     final previous = _previous;
     if (previous == null) return _text(current);

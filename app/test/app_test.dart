@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rotide_core/rotide_core.dart';
 import 'package:rotide_dm/document/document_controller.dart';
@@ -132,11 +132,67 @@ void main() {
       expect(menu.open, isFalse);
     });
 
+    test('the pointer picks the command Return inserts', () {
+      final menu = CommandMenuController();
+      menu.update(const TextEditingValue(text: '', selection: TextSelection.collapsed(offset: 0)));
+      menu.update(const TextEditingValue(text: '/', selection: TextSelection.collapsed(offset: 1)));
+      menu.select(3);
+      expect(menu.chosen?.name, 'нумерация');
+      menu.select(editorCommands.length);
+      expect(menu.index, 3);
+    });
+
     test('a slash inside a line does not open the menu', () {
       final menu = CommandMenuController();
       menu.update(const TextEditingValue(text: 'a', selection: TextSelection.collapsed(offset: 1)));
       menu.update(const TextEditingValue(text: 'a/', selection: TextSelection.collapsed(offset: 2)));
       expect(menu.open, isFalse);
+    });
+  });
+
+  group('menu highlight', () {
+    Widget menu(double? top, {bool reduced = false}) => Directionality(
+          textDirection: TextDirection.ltr,
+          child: RotideTheme(
+            dark: false,
+            accessibility: RotideAccessibility(reduceMotion: reduced),
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(width: 200, child: MenuHighlight(top: top, height: 30, child: const SizedBox(height: 120))),
+            ),
+          ),
+        );
+    Positioned plate(WidgetTester tester) =>
+        tester.widget<Positioned>(find.descendant(of: find.byType(MenuHighlight), matching: find.byType(Positioned)));
+    double alpha(WidgetTester tester) =>
+        (tester.widget<DecoratedBox>(find.descendant(of: find.byType(MenuHighlight), matching: find.byType(DecoratedBox))).decoration
+                as ShapeDecoration)
+            .color!
+            .a;
+
+    testWidgets('slides between rows on a spring and fades out when the pointer leaves', (tester) async {
+      await tester.pumpWidget(menu(0));
+      await tester.pumpWidget(menu(60));
+      await tester.pump(const Duration(milliseconds: 40));
+      expect(plate(tester).top, inExclusiveRange(0, 60));
+      await tester.pumpAndSettle();
+      expect(plate(tester).top, 60);
+      await tester.pumpWidget(menu(null));
+      await tester.pumpAndSettle();
+      expect(alpha(tester), 0);
+      // A faded-out plate appears at the new row instead of sliding from the old one.
+      await tester.pumpWidget(menu(0));
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(plate(tester).top, 0);
+      await tester.pumpAndSettle();
+      expect(alpha(tester), greaterThan(0));
+    });
+
+    testWidgets('moves at once with Reduce Motion', (tester) async {
+      await tester.pumpWidget(menu(0, reduced: true));
+      await tester.pumpWidget(menu(90, reduced: true));
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(plate(tester).top, 90);
     });
   });
 

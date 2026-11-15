@@ -81,6 +81,13 @@ final class CommandMenuController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The pointer moved over a command: it becomes the one Return inserts, as in a system menu.
+  void select(int value) {
+    if (value == index || value < 0 || value >= filtered.length) return;
+    index = value;
+    notifyListeners();
+  }
+
   void close() {
     if (start == null) return;
     start = null;
@@ -173,8 +180,8 @@ final class _CommandList extends StatefulWidget {
 }
 
 class _CommandListState extends State<_CommandList> {
+  static const _rowHeight = 30.0;
   final _scroll = ScrollController();
-  int? _hovered;
 
   @override
   void dispose() {
@@ -189,31 +196,38 @@ class _CommandListState extends State<_CommandList> {
     final commands = controller.filtered;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scroll.hasClients) return;
-      final top = controller.index * 30.0;
+      final top = controller.index * _rowHeight;
       final position = _scroll.position;
       if (top < position.pixels) _scroll.jumpTo(top);
-      if (top + 30 > position.pixels + position.viewportDimension) _scroll.jumpTo(top + 30 - position.viewportDimension);
+      if (top + _rowHeight > position.pixels + position.viewportDimension) _scroll.jumpTo(top + _rowHeight - position.viewportDimension);
     });
     return RaisedSurface(
       child: Padding(
         padding: const EdgeInsets.all(Radii.panelPadding),
-        child: ListView.builder(
+        child: SingleChildScrollView(
           controller: _scroll,
-          padding: EdgeInsets.zero,
-          itemExtent: 30,
-          itemCount: commands.length,
-          itemBuilder: (context, index) => MouseRegion(
-            onEnter: (_) => setState(() => _hovered = index),
-            onExit: (_) => setState(() => _hovered = null),
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => widget.onChoose(commands[index]),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                alignment: Alignment.centerLeft,
-                decoration: continuousDecoration(radius: Radii.row, color: (_hovered ?? controller.index) == index ? palette.hover : null),
-                child: LabelText(commands[index].name, style: RotideFonts.system(13, color: palette.ink)),
-              ),
+          child: MenuHighlight(
+            top: controller.index * _rowHeight,
+            height: _rowHeight,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var index = 0; index < commands.length; index++)
+                  // onHover, not onEnter: a list scrolled by the arrow keys under a resting pointer keeps the keyboard choice.
+                  MouseRegion(
+                    onHover: (_) => controller.select(index),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => widget.onChoose(commands[index]),
+                      child: Container(
+                        height: _rowHeight,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        alignment: Alignment.centerLeft,
+                        child: LabelText(commands[index].name, style: RotideFonts.system(13, color: palette.ink)),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
@@ -223,13 +237,22 @@ class _CommandListState extends State<_CommandList> {
 }
 
 /// The editor's right-click menu in the shell style: cut, copy, paste, select all.
-final class EditorContextMenu extends StatelessWidget {
+final class EditorContextMenu extends StatefulWidget {
   const EditorContextMenu({super.key, required this.state});
   final EditableTextState state;
 
   @override
+  State<EditorContextMenu> createState() => _EditorContextMenuState();
+}
+
+class _EditorContextMenuState extends State<EditorContextMenu> {
+  static const _rowHeight = 30.0;
+  int? _hovered;
+
+  @override
   Widget build(BuildContext context) {
     final palette = RotideTheme.paletteOf(context);
+    final state = widget.state;
     final anchor = state.contextMenuAnchors.primaryAnchor;
     final screen = MediaQuery.sizeOf(context);
     final items = <(String, VoidCallback?)>[
@@ -239,7 +262,8 @@ final class EditorContextMenu extends StatelessWidget {
       ('выбрать все', state.selectAllEnabled ? () => state.selectAll(SelectionChangedCause.toolbar) : null),
     ];
     const width = 200.0;
-    final height = 2 * Radii.panelPadding + 30.0 * items.length;
+    final height = 2 * Radii.panelPadding + _rowHeight * items.length;
+    final hovered = _hovered;
     return Stack(
       children: [
         Positioned.fill(child: GestureDetector(behavior: HitTestBehavior.opaque, onTapDown: (_) => state.hideToolbar())),
@@ -250,28 +274,37 @@ final class EditorContextMenu extends StatelessWidget {
           child: RaisedSurface(
             child: Padding(
               padding: const EdgeInsets.all(Radii.panelPadding),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (final (title, run) in items)
-                    Interactive(
-                      onTap: run == null
-                          ? null
-                          : () {
-                              run();
-                              state.hideToolbar();
-                            },
-                      enabled: run != null,
-                      semanticLabel: title,
-                      builder: (context, hover, pressed) => Container(
-                        height: 30,
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        alignment: Alignment.centerLeft,
-                        decoration: continuousDecoration(radius: Radii.row, color: hover ? palette.hover : null),
-                        child: LabelText(title, style: RotideFonts.system(13, color: run == null ? palette.text3 : palette.ink)),
+              child: MenuHighlight(
+                top: hovered != null && items[hovered].$2 != null ? hovered * _rowHeight : null,
+                height: _rowHeight,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final (index, (title, run)) in items.indexed)
+                      MouseRegion(
+                        onEnter: (_) => setState(() => _hovered = index),
+                        onExit: (_) {
+                          if (_hovered == index) setState(() => _hovered = null);
+                        },
+                        child: Interactive(
+                          onTap: run == null
+                              ? null
+                              : () {
+                                  run();
+                                  state.hideToolbar();
+                                },
+                          enabled: run != null,
+                          semanticLabel: title,
+                          builder: (context, hover, pressed) => Container(
+                            height: _rowHeight,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            alignment: Alignment.centerLeft,
+                            child: LabelText(title, style: RotideFonts.system(13, color: run == null ? palette.text3 : palette.ink)),
+                          ),
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

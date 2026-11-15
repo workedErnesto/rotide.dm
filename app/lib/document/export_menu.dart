@@ -51,7 +51,9 @@ final class _ExportMenu extends StatefulWidget {
 }
 
 class _ExportMenuState extends State<_ExportMenu> {
+  static const _header = 24.0, _rowHeight = 30.0, _separator = 2 * Space.micro + 1;
   final _focus = FocusNode(debugLabel: 'export menu');
+  double? _highlight;
 
   @override
   void initState() {
@@ -66,6 +68,15 @@ class _ExportMenuState extends State<_ExportMenu> {
   }
 
   void _close() => widget.controller.setExportMenu(false);
+
+  /// Follows the pointer over the rows; leaving a row clears the highlight unless another row already took it.
+  ValueChanged<bool> _hover(double top) => (inside) {
+        if (inside) {
+          setState(() => _highlight = top);
+        } else if (_highlight == top) {
+          setState(() => _highlight = null);
+        }
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -88,38 +99,50 @@ class _ExportMenuState extends State<_ExportMenu> {
           child: RaisedSurface(
             child: Padding(
               padding: const EdgeInsets.all(Radii.panelPadding),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Container(
-                    height: 24,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    alignment: Alignment.centerLeft,
-                    child: LabelText('экспорт', style: RotideFonts.system(11, weight: FontWeight.w500, color: palette.text3)),
-                  ),
-                  for (final format in ExportFormat.values)
-                    MenuRow(symbol: format.symbol, title: format.title, hint: '.${format.extension}', onTap: () => controller.export(format)),
-                  const Padding(padding: EdgeInsets.symmetric(vertical: Space.micro, horizontal: 10), child: Hairline()),
-                  MenuRow(
-                    symbol: 'square.and.arrow.down',
-                    title: 'сохранить как Markdown…',
-                    hint: shortcutHint('⇧⌘S'),
-                    onTap: () {
-                      _close();
-                      controller.saveAs();
-                    },
-                  ),
-                  MenuRow(
-                    symbol: 'printer',
-                    title: 'напечатать…',
-                    hint: shortcutHint('⌘P'),
-                    onTap: () {
-                      _close();
-                      controller.print();
-                    },
-                  ),
-                ],
+              child: MenuHighlight(
+                top: _highlight,
+                height: _rowHeight,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      height: _header,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      alignment: Alignment.centerLeft,
+                      child: LabelText('экспорт', style: RotideFonts.system(11, weight: FontWeight.w500, color: palette.text3)),
+                    ),
+                    for (final format in ExportFormat.values)
+                      MenuRow(
+                        symbol: format.symbol,
+                        title: format.title,
+                        hint: '.${format.extension}',
+                        onHover: _hover(_header + _rowHeight * format.index),
+                        onTap: () => controller.export(format),
+                      ),
+                    const Padding(padding: EdgeInsets.symmetric(vertical: Space.micro, horizontal: 10), child: Hairline()),
+                    MenuRow(
+                      symbol: 'square.and.arrow.down',
+                      title: 'сохранить как Markdown…',
+                      hint: shortcutHint('⇧⌘S'),
+                      onHover: _hover(_header + _rowHeight * ExportFormat.values.length + _separator),
+                      onTap: () {
+                        _close();
+                        controller.saveAs();
+                      },
+                    ),
+                    MenuRow(
+                      symbol: 'printer',
+                      title: 'напечатать…',
+                      hint: shortcutHint('⌘P'),
+                      onHover: _hover(_header + _rowHeight * (ExportFormat.values.length + 1) + _separator),
+                      onTap: () {
+                        _close();
+                        controller.print();
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -129,29 +152,31 @@ class _ExportMenuState extends State<_ExportMenu> {
   }
 }
 
-/// A row of a shell menu: symbol, title and a quiet hint at the end.
+/// A row of a shell menu: symbol, title and a quiet hint at the end. The menu draws the hover plate behind its rows
+/// ([MenuHighlight]); the row reports the pointer through [onHover] and brightens its symbol.
 final class MenuRow extends StatelessWidget {
-  const MenuRow({super.key, required this.symbol, required this.title, required this.hint, required this.onTap});
+  const MenuRow({super.key, required this.symbol, required this.title, required this.hint, required this.onHover, required this.onTap});
   final String symbol;
   final String title;
   final String hint;
+  final ValueChanged<bool> onHover;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final palette = RotideTheme.paletteOf(context);
-    return Interactive(
-      onTap: onTap,
-      semanticLabel: title,
-      builder: (context, hover, pressed) => PressScale(
-        pressed: pressed,
-        scale: 0.98,
-        child: HoverColor(
-          color: hover ? palette.hover : const Color(0x00000000),
-          builder: (context, fill) => Container(
+    return MouseRegion(
+      onEnter: (_) => onHover(true),
+      onExit: (_) => onHover(false),
+      child: Interactive(
+        onTap: onTap,
+        semanticLabel: title,
+        builder: (context, hover, pressed) => PressScale(
+          pressed: pressed,
+          scale: 0.98,
+          child: Container(
             height: 30,
             padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: continuousDecoration(radius: Radii.row, color: fill),
             child: Row(
               children: [
                 SizedBox(

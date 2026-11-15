@@ -82,6 +82,12 @@ abstract final class RotideFonts {
     return 0;
   }
 
+  /// How far a line of lowercase interface text sits below the middle of its line box: the box keeps room above the
+  /// x-height for capitals and below the baseline for descenders, and rotide.dm writes its labels from a lowercase
+  /// letter. Measured in the running app on the macOS system font at 12.5 and 13 pt (1.5 to 1.75 pt). Segoe UI on
+  /// Windows has not been measured, so nothing is raised there.
+  static double lowercaseDrop(double size) => _mac ? 0.125 * size : 0;
+
   /// SwiftUI `.system(size:weight:)`.
   static TextStyle system(double size, {FontWeight weight = FontWeight.w400, Color? color, double? height, double? tracking}) =>
       TextStyle(
